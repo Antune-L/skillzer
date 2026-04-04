@@ -1,0 +1,268 @@
+# Scoring Criteria for Audit Agents/Skills/Commands
+# Version: 2.0.0
+# Sources: Anthropic SKILLS-BEST-PRACTICES.md + Claude Code conventions
+
+# =============================================================================
+# AGENTS (32 points max)
+# =============================================================================
+
+agents:
+  max_points: 32
+
+  categories:
+    identity:
+      weight: 3
+      criteria:
+        - id: A1.1
+          name: "Clear name"
+          points: 3
+          check: "frontmatter.name exists, is descriptive, matches directory name"
+
+        - id: A1.2
+          name: "Description as trigger, short"
+          points: 3
+          check: "1-2 sentences max, tells model WHEN to activate (not a summary). Penalize verbose descriptions — they waste context tokens on every session"
+
+        - id: A1.3
+          name: "Model specified"
+          points: 3
+          check: "frontmatter has 'model:' field (sonnet/haiku/opus)"
+
+        - id: A1.4
+          name: "Role defined"
+          points: 3
+          check: "contains 'You are' or equivalent persona statement"
+
+    content:
+      weight: 2
+      criteria:
+        - id: A2.1
+          name: "Focused scope"
+          points: 2
+          check: "single responsibility — not 'general purpose' or multi-domain"
+
+        - id: A2.2
+          name: "Non-obvious knowledge"
+          points: 2
+          check: "focuses on what Claude wouldn't know by default — not generic advice"
+
+        - id: A2.3
+          name: "Output format specified"
+          points: 2
+          check: "has section defining expected deliverables"
+
+        - id: A2.4
+          name: "Flexible, not railroading"
+          points: 2
+          check: "gives info + room to adapt, not rigid step-by-step scripts"
+
+    quality:
+      weight: 1
+      criteria:
+        - id: A3.1
+          name: "No hardcoded paths"
+          points: 1
+          check: "no /Users/, /home/, C:\\ in content"
+
+        - id: A3.2
+          name: "Reasonable size"
+          points: 1
+          check: "main file < 200 lines"
+
+        - id: A3.3
+          name: "Composes with skills"
+          points: 1
+          check: "references other skills/agents it works with"
+
+        - id: A3.4
+          name: "No overlap with other agents"
+          points: 1
+          check: "description doesn't duplicate >50% keywords from another agent"
+
+    design:
+      weight: 2
+      criteria:
+        - id: A4.1
+          name: "Anti-hallucination measures"
+          points: 2
+          check: "mentions verify/cite/source or warns against inventing"
+
+        - id: A4.2
+          name: "Edge cases documented"
+          points: 2
+          check: "mentions limitations, failure modes, or when NOT to use"
+
+        - id: A4.3
+          name: "Examples provided"
+          points: 2
+          check: "has usage examples or scenarios"
+
+        - id: A4.4
+          name: "Progressive disclosure"
+          points: 2
+          check: "uses subfiles/folders for detailed content instead of monolith"
+
+# =============================================================================
+# SKILLS (32 points max)
+# =============================================================================
+
+skills:
+  max_points: 32
+
+  categories:
+    identity:
+      weight: 3
+      criteria:
+        - id: S1.1
+          name: "Valid SKILL.md"
+          points: 3
+          check: "file named SKILL.md with YAML frontmatter"
+
+        - id: S1.2
+          name: "Name valid and matches directory"
+          points: 3
+          check: "lowercase, 1-64 chars, [a-z0-9-]+, matches directory name"
+
+        - id: S1.3
+          name: "Description as trigger, short"
+          points: 3
+          check: "1-2 sentences max, tells model WHEN to activate (not a summary). Penalize verbose descriptions — they waste context tokens on every session"
+
+        - id: S1.4
+          name: "Single category"
+          points: 3
+          check: "fits one of: Library, Verification, Data, Business, Scaffold, Quality, CI/CD, Runbook, Infra"
+
+    content:
+      weight: 2
+      criteria:
+        - id: S2.1
+          name: "Non-obvious knowledge"
+          points: 2
+          check: "focuses on info Claude wouldn't know — not 'write clean code'"
+
+        - id: S2.2
+          name: "Gotchas section"
+          points: 2
+          check: "has ## Gotchas with real failure cases (highest-signal content)"
+
+        - id: S2.3
+          name: "Workflow/methodology"
+          points: 2
+          check: "has clear process (numbered steps or phases)"
+
+        - id: S2.4
+          name: "Output format specified"
+          points: 2
+          check: "defines what the skill delivers"
+
+    quality:
+      weight: 1
+      criteria:
+        - id: S3.1
+          name: "No hardcoded paths"
+          points: 1
+          check: "no /Users/, /home/, C:\\ in content"
+
+        - id: S3.2
+          name: "No secrets"
+          points: 1
+          check: "no plaintext passwords, tokens, API keys"
+
+        - id: S3.3
+          name: "Composes with other skills"
+          points: 1
+          check: "references prereq skills or related skills"
+
+        - id: S3.4
+          name: "Flexible, not railroading"
+          points: 1
+          check: "gives info + room to adapt, not overly rigid"
+
+    design:
+      weight: 2
+      criteria:
+        - id: S4.1
+          name: "Progressive disclosure"
+          points: 2
+          check: "uses subfiles/folders for details instead of massive SKILL.md"
+
+        - id: S4.2
+          name: "Reasonable size"
+          points: 2
+          check: "SKILL.md < ~200 lines; uses filesystem for extras"
+
+        - id: S4.3
+          name: "No overlap with other skills"
+          points: 2
+          check: "description doesn't duplicate another skill's scope"
+
+        - id: S4.4
+          name: "English content"
+          points: 2
+          check: "skill content in English for consistency and portability"
+
+# =============================================================================
+# COMMANDS (20 points max)
+# =============================================================================
+
+commands:
+  max_points: 20
+
+  categories:
+    structure:
+      weight: 3
+      criteria:
+        - id: C1.1
+          name: "Valid frontmatter"
+          points: 3
+          check: "has name + description in frontmatter"
+
+        - id: C1.2
+          name: "Argument hint"
+          points: 3
+          check: "if uses $ARGUMENTS, has argument-hint in frontmatter"
+
+        - id: C1.3
+          name: "Step-by-step workflow"
+          points: 3
+          check: "numbered steps or clear phases"
+
+        - id: C1.4
+          name: "Description as trigger, short"
+          points: 3
+          check: "1-2 sentences max, tells model WHEN to use (not a summary). Penalize verbose descriptions — they waste context tokens on every session"
+
+    quality:
+      weight: 2
+      criteria:
+        - id: C2.1
+          name: "Error handling"
+          points: 2
+          check: "mentions failure modes or fallbacks"
+
+        - id: C2.2
+          name: "Output format defined"
+          points: 2
+          check: "specifies what command produces"
+
+        - id: C2.3
+          name: "Reasonable size"
+          points: 2
+          check: "< 150 lines"
+
+        - id: C2.4
+          name: "No hardcoded paths"
+          points: 2
+          check: "no /Users/, /home/, C:\\"
+
+# =============================================================================
+# GRADING
+# =============================================================================
+
+grades:
+  A: { min: 90, label: "Production-ready" }
+  B: { min: 80, label: "Good (production threshold)" }
+  C: { min: 70, label: "Needs work" }
+  D: { min: 60, label: "Significant gaps" }
+  F: { min: 0, label: "Major rewrite needed" }
