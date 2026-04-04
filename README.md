@@ -17,7 +17,33 @@ skillzer/
 
 The [`CLAUDE.md`](./CLAUDE.md) at the root of this repo is a guide on how to write an effective CLAUDE.md for your projects — philosophy, principles, anti-patterns. The [`example/`](./example/) directory contains a ready-to-copy template with a pre-filled CLAUDE.md and `docs/` structure for a typical TypeScript/React/Node.js project.
 
-## Usage
+## Installation
+
+### Via the `skills` CLI (recommended)
+
+Install any skill with a single command using [skills](https://github.com/vercel-labs/skills):
+
+```bash
+npx skills add Antune-L/skillzer/skills/<skill-name>
+```
+
+Available skills:
+
+```bash
+npx skills add Antune-L/skillzer/skills/audit-agents-skills
+npx skills add Antune-L/skillzer/skills/branch-summary
+npx skills add Antune-L/skillzer/skills/code-principles-review
+npx skills add Antune-L/skillzer/skills/code-review
+npx skills add Antune-L/skillzer/skills/coding-convention
+npx skills add Antune-L/skillzer/skills/frontend-chrome-debug
+npx skills add Antune-L/skillzer/skills/plan-review
+npx skills add Antune-L/skillzer/skills/prd
+npx skills add Antune-L/skillzer/skills/regression-check
+npx skills add Antune-L/skillzer/skills/smart-explore
+npx skills add Antune-L/skillzer/skills/ts-search-first
+```
+
+### Manual
 
 Copy or symlink the desired items into your `~/.claude/` directory:
 
