@@ -75,7 +75,8 @@ See [`CLAUDE.md`](./CLAUDE.md) for more on writing effective skills and project 
 
 Skills we use but that aren't included in this repo — install them separately:
 
-- **[simplifier](https://github.com/anthropics/claude-code/tree/main/plugins/official/code-simplifier)** (Claude official) — simplifies and refines code for clarity and maintainability while preserving functionality. Run it after every coding session.
+- **simplifier** (Claude official) — simplifies and refines code for clarity and maintainability while preserving functionality. Run it after every coding session.
+- **autofix-pr** (Claude official) — automatically fixes common issues in pull requests. Run it before merging.
 - **[systematic-debugging](https://github.com/anthropics/claude-code/tree/main/plugins/official/systematic-debugging)** (Claude official) — structured root cause analysis with defense-in-depth strategies. Use when a bug resists the first fix attempt.
 - **[vercel-react-best-practices](https://github.com/nichochar/vercel-react-best-practices)** — 47 performance rules for React/Next.js (rendering, caching, bundle size, async patterns).
 - **[grill-me](https://github.com/mattpocock/skills/tree/main/grill-me)** (Matt Pocock) — grills you with questions to test your understanding of a topic. Great for learning and interview prep.
