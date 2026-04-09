@@ -32,11 +32,11 @@ Available skills:
 ```bash
 npx skills add Antune-L/skillzer/skills/audit-agents-skills
 npx skills add Antune-L/skillzer/skills/branch-summary
-npx skills add Antune-L/skillzer/skills/code-principles-review
 npx skills add Antune-L/skillzer/skills/code-review
 npx skills add Antune-L/skillzer/skills/coding-convention
 npx skills add Antune-L/skillzer/skills/frontend-chrome-debug
 npx skills add Antune-L/skillzer/skills/plan-review
+npx skills add Antune-L/skillzer/skills/pr-review-orchestrator
 npx skills add Antune-L/skillzer/skills/prd
 npx skills add Antune-L/skillzer/skills/regression-check
 npx skills add Antune-L/skillzer/skills/smart-explore

@@ -1,113 +1,87 @@
 ---
 name: code-review
-description: "Full code review (own branch or colleague's) for code principles violations and reinvented-wheel patterns. Trigger at end of coding or on any branch."
+description: "Review changed code (session, current branch, or colleague's branch) for principle violations, reinvented wheels, and dead code. Trigger after coding, before merge, or for PR review."
 ---
 
 # Code Review
 
-Branch-aware code review combining **code principles** analysis and **reuse detection**. Produces structured findings grouped by file with severity levels.
+Diff-scoped review for software design principles, library reuse, and dead code/complexity. **Read-only** by default — present findings, do not modify.
 
-## Usage
+## Scope modes
 
-- `/code-review` — review current branch vs its base
-- `/code-review feat/xyz` — review a colleague's branch
-- `/code-review feat/xyz main` — explicit base branch
+| Invocation | Scope |
+|---|---|
+| `/code-review` (no arg) | **Session** — `git diff` (staged + unstaged) |
+| `/code-review --branch` | Current branch vs `main` / `master` |
+| `/code-review <name>` | Colleague's remote branch (`git fetch origin <name>` first) |
+
+Detect the base branch via `git config init.defaultBranch` or fall back to `main` then `master`. If neither exists, ask the user.
+
+**Skip:** lock files, generated code, migration files (unless they contain hand-written logic).
 
 ## Procedure
 
-### 1. Determine scope
+1. **Resolve scope** — list changed files for the chosen mode.
+2. **Detect ecosystem** — read `package.json` (deps + devDeps), locate `components/ui/`, `lib/`, `utils/`, `hooks/`. Required for reuse detection.
+3. **Apply checks** for each changed file:
+   - Principles & reuse → [`references/checklist.md`](references/checklist.md)
+   - Dead code & complexity → [`references/extra-checks.md`](references/extra-checks.md)
+4. **Confirm before flagging** — for any DRY or reuse hit, `Grep`/`Glob` the codebase to confirm the duplication or existing utility actually exists. Never flag from intuition.
+5. **Output findings** — see format below. If nothing is found, say so. Do not invent issues.
 
-```bash
-# Own branch (no argument)
-BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master)
-git diff $BASE...HEAD --name-only
+## Output format
 
-# Colleague's branch (argument provided)
-git fetch origin <branch> --quiet
-BASE=$(git merge-base origin/<branch> main 2>/dev/null || git merge-base origin/<branch> master)
-git diff $BASE...origin/<branch> --name-only
-```
-
-If the base branch is neither `main` nor `master`, detect from git config or ask user.
-
-Only review **changed files**. Ignore lock files, generated code, and migration files unless they contain hand-written logic.
-
-### 2. Load diff context
-
-For each changed file, read the full diff to understand changes. Read the full file when needed to check surrounding code (e.g., nearby helpers).
-
-### 3. Detect project ecosystem
-
-Before reviewing for reuse: read `package.json` (all deps), identify the component library (`components/ui/`), locate shared utilities (`lib/`, `utils/`, `hooks/`), and note project-specific patterns.
-
-### 4. Review — Code Principles
-
-Apply the full checklist from [`../code-principles-review/references/checklist.md`](../code-principles-review/references/checklist.md) across all changed files. Covers: DRY, SOLID, KISS, and library/component reuse.
-
-Additionally check for **dead code & complexity** not covered by that checklist:
-- Unreachable branches, unused variables/imports/exports
-- Nested ternaries, deeply nested callbacks
-- Functions exceeding ~50 lines without clear justification
-
-For each suspected DRY or reuse violation, search the codebase (`Grep`/`Glob`) to confirm before flagging.
-
-### 5. Output findings
-
-Group by file. For each finding:
+Group findings by file. Each finding:
 
 ```
 ### `path/to/file.ts`
 
 #### [critical] L42-L58 — Duplicated validation logic
-The email validation regex is identical to `lib/validators.ts:L12`.
+The email regex matches `lib/validators.ts:L12`.
 **Suggestion:** Import `emailSchema` from `lib/validators`.
-
-#### [warning] L103 — Premature abstraction
-`createGenericHandler<T>` has a single caller.
-**Suggestion:** Inline directly. Extract only if a second use case emerges.
-
-#### [nit] L77 — Unused import
-**Suggestion:** Remove unused `useState` import.
 ```
 
-Severity:
-- **critical** — maintenance pain or bugs. Must fix.
-- **warning** — real benefit, lower urgency. Should fix.
-- **nit** — taste-level, low impact. Consider.
+Severity scale:
 
-### 6. Summary
+- **critical** — bug or maintenance pain. Must fix.
+- **warning** — clear improvement, lower urgency. Should fix.
+- **nit** — taste-level. Consider.
+
+End with a summary table:
 
 ```
-## Summary
-
 | Severity | Count |
 |----------|-------|
 | Critical | X     |
 | Warning  | Y     |
 | Nit      | Z     |
 
-**Key themes:** [1-2 sentences on main patterns across files]
+Key themes: <1-2 sentences on patterns across files>
 ```
 
-If no findings, state it — do not invent issues.
+For concrete before/after examples, see [`references/examples.md`](references/examples.md).
 
 ## Rules
 
-- Only review changed code — do not flag pre-existing issues in untouched lines
-- Do not recommend adding new dependencies; only flag reuse of already-installed packages or native APIs
-- Do not flag standard library usage (`Array.prototype`, etc.) as reinvention
-- DRY applies at 2+ actual duplications, not hypothetical future ones
-- SOLID applies differently to React components vs backend — a component combining render + simple hook is not SRP violation
-- Do not auto-fix — present findings only. User decides what to action.
-
-## Composability
-
-- **`code-principles-review`** — this skill delegates the principles checklist to it. If `code-principles-review` is updated, this skill benefits automatically.
-- **`codex-review`** — after presenting findings, follow the `codex-review` protocol: apply verification gates before claiming the review is complete, and when the user acts on findings, follow the code-review-reception protocol (technical rigor, no performative agreement, verify before implementing).
-- **`coding-convention`** — defer naming, formatting, and file-placement issues to this skill.
+- **Read-only.** Present findings; do not edit. The user decides what to action and asks explicitly.
+- **Only changed code.** Never flag pre-existing issues in untouched lines.
+- **No new dependencies.** Only flag reuse of already-installed packages or native APIs.
+- **DRY needs 2+ real duplications.** Never hypothetical future ones.
+- **SOLID adapts to React.** A component combining render + a small hook is not an SRP violation.
+- **Standard library is not reinvention.** `Array.prototype.filter` over a lodash equivalent is fine.
 
 ## Gotchas
 
-- When reviewing a colleague's remote branch, always `git fetch` first — local refs may be stale.
-- `git merge-base` can fail if branches share no common ancestor (e.g., orphan branches). Fall back to asking the user for the base commit.
-- On large diffs (50+ files), prioritize files with the most logic changes over config/style-only changes to stay within context budget.
+- Reviewing a colleague's branch: always `git fetch origin <branch>` first — local refs may be stale.
+- `git merge-base` fails on orphan branches with no common ancestor — fall back to asking the user for the base commit.
+- Large diffs (50+ files): prioritize files with logic changes over config/style-only changes to stay within context budget.
+- A dependency in `package.json` that the codebase never imports is a strong reinvention signal — grep the package name; zero hits often means the team added it then wrote custom code instead.
+- Session scope (`git diff`) misses untracked files. If new files are likely, run `git status` and add them to the review set manually.
+- Do not flag a single-use helper as DRY — DRY applies at 2+ actual duplications.
+
+## Composability
+
+- **`architecture-review`** — complementary. Handles cross-package coupling, macro pattern divergence, and macro-level wheel reinvention. This skill handles **local** quality (function/variable-level DRY, SOLID, dead code, local complexity). If a finding is about a module boundary, package dependency, or divergence from sibling files, defer to `architecture-review`.
+- **`regression-check`** — pair with this skill to map the blast radius of changed symbols. Complementary, not redundant.
+- **`coding-convention`** — defer naming, formatting, and file-placement issues.
+- **`simplifier`** — defer pure clarity/readability cleanup.
