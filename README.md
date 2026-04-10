@@ -77,7 +77,7 @@ Skills we use but that aren't included in this repo — install them separately:
 
 - **simplifier** (Claude official) — simplifies and refines code for clarity and maintainability while preserving functionality. Run it after every coding session.
 - **autofix-pr** (Claude official) — automatically fixes common issues in pull requests. Run it before merging.
-- **[systematic-debugging](https://github.com/anthropics/claude-code/tree/main/plugins/official/systematic-debugging)** (Claude official) — structured root cause analysis with defense-in-depth strategies. Use when a bug resists the first fix attempt.
+- **systematic-debugging** (Claude official) — structured root cause analysis with defense-in-depth strategies. Use when a bug resists the first fix attempt.
 - **[vercel-react-best-practices](https://github.com/nichochar/vercel-react-best-practices)** — 47 performance rules for React/Next.js (rendering, caching, bundle size, async patterns).
 - **[grill-me](https://github.com/mattpocock/skills/tree/main/grill-me)** (Matt Pocock) — grills you with questions to test your understanding of a topic. Great for learning and interview prep.
 
@@ -90,5 +90,5 @@ Skills we use but that aren't included in this repo — install them separately:
 - **Run automated loops with Ralphy** — a Claude Code skill that runs prompts or slash commands on a recurring interval, great for polling or repeated checks: [michaelshimeles/ralphy](https://github.com/michaelshimeles/ralphy)
 - **Leverage MCP servers** — extend Claude Code with Model Context Protocol servers:
   - [Context7](https://context7.com/) — fetch up-to-date library/framework documentation on the fly
-  - [Playwright MCP](https://playwright.dev/docs/getting-started-mcp) — browser automation for testing and debugging
+  - [Playwright MCP](https://github.com/microsoft/playwright-mcp) — browser automation for live testing and debugging (see [setup below](#playwright-mcp-setup))
   - [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) — interact with Chrome DevTools directly from Claude
