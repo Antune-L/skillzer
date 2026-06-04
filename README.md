@@ -34,9 +34,7 @@ npx skills add Antune-L/skillzer/skills/audit-agents-skills
 npx skills add Antune-L/skillzer/skills/branch-summary
 npx skills add Antune-L/skillzer/skills/code-review
 npx skills add Antune-L/skillzer/skills/coding-convention
-npx skills add Antune-L/skillzer/skills/frontend-chrome-debug
 npx skills add Antune-L/skillzer/skills/plan-review
-npx skills add Antune-L/skillzer/skills/pr-review-orchestrator
 npx skills add Antune-L/skillzer/skills/prd
 npx skills add Antune-L/skillzer/skills/regression-check
 npx skills add Antune-L/skillzer/skills/smart-explore
@@ -79,7 +77,7 @@ Skills we use but that aren't included in this repo — install them separately:
 - **autofix-pr** (Claude official) — automatically fixes common issues in pull requests. Run it before merging.
 - **systematic-debugging** (Claude official) — structured root cause analysis with defense-in-depth strategies. Use when a bug resists the first fix attempt.
 - **[vercel-react-best-practices](https://github.com/nichochar/vercel-react-best-practices)** — 47 performance rules for React/Next.js (rendering, caching, bundle size, async patterns).
-- **[grill-me](https://github.com/mattpocock/skills/tree/main/grill-me)** (Matt Pocock) — grills you with questions to test your understanding of a topic. Great for learning and interview prep.
+- **[grill-me](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me)** (Matt Pocock) — grills you with questions to test your understanding of a topic. Great for learning and interview prep.
 
 ## Tips to Supercharge Your Claude Code Workflow
 
@@ -87,7 +85,6 @@ Skills we use but that aren't included in this repo — install them separately:
 - **Use git worktrees for parallel work** — built-in to Claude Code (`isolation: "worktree"` on agents), or use [Worktrunk](https://worktrunk.dev/config/) for a managed setup
 - **Multitask with CMUX** — a multiplexer designed for Claude Code, run multiple agents side by side: [cmux.com](https://cmux.com/fr)
 - **Get notified when Claude finishes** — set up a [hook](https://docs.anthropic.com/en/docs/claude-code/hooks) on task completion, or use CMUX which has notifications built-in
-- **Run automated loops with Ralphy** — a Claude Code skill that runs prompts or slash commands on a recurring interval, great for polling or repeated checks: [michaelshimeles/ralphy](https://github.com/michaelshimeles/ralphy)
 - **Leverage MCP servers** — extend Claude Code with Model Context Protocol servers:
   - [Context7](https://context7.com/) — fetch up-to-date library/framework documentation on the fly
   - [Playwright MCP](https://github.com/microsoft/playwright-mcp) — browser automation for live testing and debugging (see [setup below](#playwright-mcp-setup))
