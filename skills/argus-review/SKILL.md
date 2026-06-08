@@ -75,7 +75,7 @@ Full per-reviewer methodology: [`references/dimensions.md`](references/dimension
 8. **Aggregate** — merge sections, apply dedupe, compute per-section + global counts.
 9. **Compute verdict + confidence** (rules below).
 10. **Render** the report per [`references/report-format.md`](references/report-format.md).
-11. **If `--post`** — post **one PR review with each finding anchored inline at `file:line`** per [`references/posting.md`](references/posting.md): default **critical + warning only**, nits dropped, concise verdict + counts in the review body. **Never** post the full report as a single `gh pr comment` issue blob (and never both). Confirm the target PR# first.
+11. **If `--post`** — post **one PR review with each finding anchored inline at `file:line`** per [`references/posting.md`](references/posting.md): default **all severities — critical, warning, and nits**, each anchored inline, concise verdict + counts in the review body. **Never** post the full report as a single `gh pr comment` issue blob (and never both). Confirm the target PR# first.
 
 The parent never re-reads files or re-reviews code. Trust the structured replies.
 
@@ -119,7 +119,7 @@ The mechanical pass and reviewers must **not** re-flag what the team has repeate
 - **Strip generated/snapshot/lock files before dispatch** — they are noise and inflate the diff. The user always asks to ignore `snapshot.json` & friends.
 - **Default base may be `dev`, not `main`.** Detect via `origin/HEAD`. Stacked feature-branch bases are common here — honor an explicit base arg.
 - **`--post` is inline-only.** One PR review (reviews API) with findings anchored at `file:line`; the review body is a short verdict+counts summary, not the rendered report. **Never** `gh pr comment` the full report as a single conversation blob, and never post inline _and_ a full-report comment — the lone blob is "not visual" and the user rejects it. `gh pr comment` is allowed only for a zero-finding `pass`. Validate each finding's line against the diff hunks before posting (see posting.md) so they actually anchor instead of folding into the body.
-- **`--post` defaults to critical+warning, no nits.** The user's near-universal preference. Confirm the PR# and never post nits unless explicitly asked.
+- **`--post` posts all severities — nits included.** The user wants nits in the comments too. Anchor nits inline at `file:line` like any other finding; mark them `[nit]` in the comment body so they read as low-priority. Only drop nits if the user explicitly asks for critical+warning only on a given run.
 - **JSON-only replies.** Prose before/after the object is a failure — retry once, then mark failure.
 - **No new dependencies.** If a reviewer recommends adding a library, surface it as a flag, do not act on it.
 

@@ -24,7 +24,7 @@ The review `body` is a **concise summary only** — verdict + counts table + any
 
 ## Defaults (match the user's standing preference)
 
-- **Severity filter: `critical` + `warning` only. Drop all `nit`s.** The user's near-universal instruction is "pas les nit". Only include nits if explicitly asked.
+- **Severity: post all of `critical`, `warning`, and `nit`.** The user wants nits in the comments too. Anchor every nit inline like any other finding; prefix its comment body with `[nit]` so it reads as low-priority. Only drop nits if the user explicitly asks for critical+warning only on a given run.
 - **Inline at `file:line`** for every finding whose line is commentable on the PR diff (see line-validation below). Findings with no line (file-level) or whose line is off-diff → fold into the review **summary body** as a bulleted list, individually — never collapse the whole set into the body because a few don't anchor.
 - One review per run carrying all inline comments + the concise summary body.
 
@@ -74,7 +74,9 @@ Map each anchored finding to a comment object: `path`, `line`, `side: "RIGHT"`, 
     { "path": "apps/web/src/features/reviews/reviews-section.tsx", "line": 13, "side": "RIGHT",
       "body": "**[critical] regression** — `[...reviews, ...reviews]` double-counts every review; the `(… avis)` counter is inflated. Use `reviews` directly." },
     { "path": "apps/web/src/features/article/article-details-formatters.ts", "line": 42, "side": "RIGHT",
-      "body": "**[critical] conventions** — `as` cast is hard-banned (CLAUDE.md « No type casting »). Annotate the return type or use a type guard." }
+      "body": "**[critical] conventions** — `as` cast is hard-banned (CLAUDE.md « No type casting »). Annotate the return type or use a type guard." },
+    { "path": "apps/web/src/features/article/article-card.tsx", "line": 18, "side": "RIGHT",
+      "body": "**[nit] quality** — extract the repeated `border-muted` class to a shared style; cosmetic, non-blocking." }
   ]
 }
 ```
@@ -108,4 +110,4 @@ Confirm `inline` > 0 (unless the only findings were genuinely off-diff). If it i
 
 ## After posting
 
-Report back: PR#, number of **inline** comments posted, number folded into the summary body (with why), number of nits dropped, and the verdict. Keep the local rendered report intact — posting is additive, not a replacement for the report.
+Report back: PR#, number of **inline** comments posted (broken down by severity, nits included), number folded into the summary body (with why), and the verdict. Keep the local rendered report intact — posting is additive, not a replacement for the report.

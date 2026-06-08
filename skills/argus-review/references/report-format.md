@@ -80,5 +80,5 @@ Prioritized, global, actionable. The user picks what to fix.
 ## Footer
 
 ```
-_Read-only review. To post these inline on the PR, re-run with `--post` (default: critical + warning, no nits). To fix, edit manually or invoke a fix-capable tool._
+_Read-only review. To post these inline on the PR, re-run with `--post` (default: all severities, nits included). To fix, edit manually or invoke a fix-capable tool._
 ```
