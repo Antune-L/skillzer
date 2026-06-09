@@ -56,6 +56,7 @@ Gaps the classic 5-dimension split misses are **folded in**, not added as new ag
 | Payment/financial security (Stripe order-state, webhook idempotency) | security     | `payments` detected (payment SDK / webhook code)         |
 | Cross-package boundary checks                                        | architecture | `monorepo` detected                                      |
 | Error-handling & edge-cases, performance                             | quality      | always (language-agnostic)                               |
+| File size (>~400 lines → split) & inline-props-type extraction       | quality      | always (size); typed code (inline-type)                  |
 
 Full per-reviewer methodology: [`references/dimensions.md`](references/dimensions.md). Capability detection: [`references/mechanical-checks.md`](references/mechanical-checks.md).
 

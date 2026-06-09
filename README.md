@@ -79,6 +79,7 @@ Skills we use but that aren't included in this repo — install them separately:
 - **systematic-debugging** (Claude official) — structured root cause analysis with defense-in-depth strategies. Use when a bug resists the first fix attempt.
 - **[vercel-react-best-practices](https://github.com/nichochar/vercel-react-best-practices)** — 47 performance rules for React/Next.js (rendering, caching, bundle size, async patterns).
 - **[grill-me](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me)** (Matt Pocock) — grills you with questions to test your understanding of a topic. Great for learning and interview prep.
+- **[remotion](https://www.remotion.dev/docs/ai/skills)** (Remotion official) — best practices for creating videos programmatically with React, so a coding agent can build and render videos.
 
 ## Tips to Supercharge Your Claude Code Workflow
 

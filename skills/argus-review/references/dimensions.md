@@ -60,7 +60,7 @@ Rules:
 
 ## quality
 
-**Owns:** local duplication, dead code, unnecessary complexity, reuse misses — PLUS error-handling/edge-cases, accessibility, performance, React anti-patterns.
+**Owns:** local duplication, dead code, unnecessary complexity, reuse misses — PLUS error-handling/edge-cases, accessibility, performance, React anti-patterns, file size & signature readability.
 
 Analyze (diff-scoped only):
 
@@ -76,6 +76,8 @@ Analyze (diff-scoped only):
 6. **Accessibility** **[needs frontend]**: missing `alt` on images, missing `aria-label` on icon-only controls, broken heading hierarchy.
 7. **Performance**: debounce-on-keystroke missing for live search, redundant heavy fetches, side-effects in route loaders, unbounded caches, work in a render path that belongs in a memo/loader.
 8. **React anti-patterns** **[needs react]**: `useEffect` used for state derivation/sync that should be computed during render or in an event handler; stale closures; effect without justification.
+9. **Oversized files** — a file the diff **creates or grows past ~400 lines** that accretes multiple responsibilities (the classic case: a `*.service.ts` / controller bundling unrelated helpers) should be split into focused modules — extract cohesive helpers into a `*.utils.ts` / dedicated file rather than overloading one. **Only flag when the diff is responsible for the growth** (don't flag a pre-existing long file the diff barely touches), and cite the resulting line count + the suggested split axis (which group of functions moves out). A long-but-cohesive file (a single big switch, generated schema, one logical unit) is at most a `nit`. Default `warning`; `nit` if the overflow is marginal or the file is cohesive.
+10. **Inline type literals in signatures** — a function or component whose signature inlines a large object-type literal (roughly **5+ properties**, or a multi-line inline literal) should extract a **named `Props`/params type or interface** so the file reads clearly and the type is reusable. Flag at the signature `file:line`; suggest the named type. Default `nit`; `warning` only for clearly large/repeated inline literals. **Skip** trivial 1–4 field inline types and one-off internal callbacks.
 
 Ignore: security (security reviewer), cross-package architecture (architecture reviewer), blast radius (regression reviewer), mechanical bans + i18n + naming (conventions reviewer).
 
