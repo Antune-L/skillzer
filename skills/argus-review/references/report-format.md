@@ -9,7 +9,7 @@ Template for Argus's final output. Verdict + confidence header, per-section find
 
 **Verdict:** <blocking | needs-attention | pass> · **Confidence:** <high | medium | low>
 **Scope:** <N> files (+<X> / -<Y>) · <K> generated/lock/snapshot files ignored
-**Reviewers:** quality · conventions · regression[ · architecture · security]
+**Reviewers:** quality · conventions · regression · logic[ · architecture · security]
 
 ## Summary
 
@@ -20,6 +20,7 @@ Template for Argus's final output. Verdict + confidence header, per-section find
 | Regression   | X        | Y       | —   |
 | Security     | X        | Y       | —   |  ← omit row in light
 | Conventions  | X        | Y       | Z   |
+| Logic        | X        | Y       | Z   |
 | **Total**    | **X**    | **Y**   | **Z** |
 
 (Only rows for dispatched reviewers. Security never has nits.)
@@ -31,6 +32,7 @@ Template for Argus's final output. Verdict + confidence header, per-section find
 ## Regression     — grouped by changed symbol
 ## Security       — grouped by vulnerability class (full only)
 ## Conventions    — grouped by rule family
+## Logic          — grouped by business rule / intent item
 ## Subagent failures   (only if any reviewer failed)
 ## Recommended next actions
 ```
@@ -80,5 +82,5 @@ Prioritized, global, actionable. The user picks what to fix.
 ## Footer
 
 ```
-_Read-only review. To post these inline on the PR, re-run with `--post` (default: all severities, nits included). To fix, edit manually or invoke a fix-capable tool._
+_Read-only review. To post these inline on the PR, re-run with `--post` (default: all severities, nits included). To apply the fixes, say **« corrige ce qui est pertinent »** (separate step — nits skipped by default)._
 ```

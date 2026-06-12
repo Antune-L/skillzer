@@ -2,7 +2,7 @@
 
 Each block below is the **complete** instruction set for one reviewer. The orchestrator pastes the relevant block verbatim into a `general-purpose` subagent's prompt. The subagent has **no skill loaded** — this block is all it gets. Do not reference external skills or files from inside a dispatched prompt.
 
-Folded coverage: **conventions** also owns i18n/hardcoded-text; **quality** also owns error-handling, accessibility, performance, and React anti-patterns.
+Folded coverage: **conventions** also owns i18n/hardcoded-text; **quality** also owns error-handling, accessibility, performance, React anti-patterns, file size & inline-type extraction, and library API best-practices (per-lib checklists in [`library-practices.md`](library-practices.md)); **logic** owns business intent and domain invariants.
 
 ---
 
@@ -19,10 +19,11 @@ Scope:
 - Mode: <branch | staged | remote-branch>
 - Base: <base-branch>
 - Branch: <branch-name, or "" for staged>
-- Section you own: <quality | architecture | regression | security | conventions>
+- Section you own: <quality | architecture | regression | security | conventions | logic>
 
 Project capabilities (a check tagged [needs <flag>] runs ONLY if its flag is on):
 - i18n=<on|off>  frontend=<on|off>  react=<on|off>  payments=<on|off>  monorepo=<on|off>
+- Stack manifest: <libs detected from package.json, e.g. zod@4, tanstack-query, drizzle>
 
 Changed files (<N> files, +<X> / -<Y>; generated/lock/snapshot already stripped):
 <git diff --stat output>
@@ -35,6 +36,14 @@ Full patch (AUTHORITATIVE — do NOT re-run git diff; open files only for contex
 <conventions only> Mechanical pre-pass candidates to verify first, then extend:
 <seed list: file:line + matched banned pattern>
 
+<quality only> Library best-practice checklists for the detected stack (from library-practices.md, detected libs only):
+<paste the matching per-lib sections>
+
+<logic only> Intent sources (AUTHORITATIVE — do not invent intent beyond these):
+- PR title + description: <gh pr view output, or "none">
+- Linked PRD / Notion card content: <if the PR body references one, or "none">
+- Commit messages: <git log base..branch subjects+bodies>
+
 === METHODOLOGY ===
 <paste the matching dimension block below>
 
@@ -44,6 +53,7 @@ Full patch (AUTHORITATIVE — do NOT re-run git diff; open files only for contex
 Rules:
 - JSON only. No prose, no markdown fences around the object.
 - Every finding cites file:line with one concrete evidence sentence. No intuition-only findings.
+- Evidence-source rule: if a critical/warning hinges on a third-party library's runtime behavior (not on code visible in this repo — e.g. "this better-auth plugin is unsafe in prod"), verify against the lib's current docs (context7 MCP) and cite the doc passage in the finding. Unverifiable → downgrade to nit phrased as a question, or drop. An unsourced lib-behavior critical is parole-contre-parole and gets dismissed.
 - Only flag code the diff INTRODUCES or MODIFIES. Never flag pre-existing untouched code.
 - Respect the capability flags: skip any check tagged [needs <flag>] when that flag is off. (e.g. i18n=off → never flag hardcoded user-facing text or hardcoded locale.)
 - set "section" on every finding to the section you own.
@@ -78,10 +88,36 @@ Analyze (diff-scoped only):
 8. **React anti-patterns** **[needs react]**: `useEffect` used for state derivation/sync that should be computed during render or in an event handler; stale closures; effect without justification.
 9. **Oversized files** — a file the diff **creates or grows past ~400 lines** that accretes multiple responsibilities (the classic case: a `*.service.ts` / controller bundling unrelated helpers) should be split into focused modules — extract cohesive helpers into a `*.utils.ts` / dedicated file rather than overloading one. **Only flag when the diff is responsible for the growth** (don't flag a pre-existing long file the diff barely touches), and cite the resulting line count + the suggested split axis (which group of functions moves out). A long-but-cohesive file (a single big switch, generated schema, one logical unit) is at most a `nit`. Default `warning`; `nit` if the overflow is marginal or the file is cohesive.
 10. **Inline type literals in signatures** — a function or component whose signature inlines a large object-type literal (roughly **5+ properties**, or a multi-line inline literal) should extract a **named `Props`/params type or interface** so the file reads clearly and the type is reusable. Flag at the signature `file:line`; suggest the named type. Default `nit`; `warning` only for clearly large/repeated inline literals. **Skip** trivial 1–4 field inline types and one-off internal callbacks.
+11. **Library API best-practices** **[needs lib in stack manifest]** — apply the per-lib checklist pasted in your envelope (only the detected libs). Flag misuse of a library the diff touches: deprecated API forms, error-prone patterns the lib documents against, reimplementing what the lib provides. The checklist is the baseline, not a ceiling — extend it with documented best practices you are *certain* apply to the detected version. **When unsure whether an API is current for the detected version, query the context7 MCP for that lib's docs instead of flagging from memory** — a flag based on a stale version is a false positive. Severity: `warning` for error-prone misuse (silent failure, throw at boundary), `nit` for stylistic lib idioms.
 
-Ignore: security (security reviewer), cross-package architecture (architecture reviewer), blast radius (regression reviewer), mechanical bans + i18n + naming (conventions reviewer).
+Ignore: security (security reviewer), cross-package architecture (architecture reviewer), blast radius (regression reviewer), mechanical bans + i18n + naming (conventions reviewer), business intent (logic reviewer).
 
 Severity: `critical` = a real bug shipped by the diff (wrong output, crash, data loss). `warning` = maintainability/robustness risk. `nit` = cosmetic.
+
+---
+
+## logic
+
+**Owns:** business-logic correctness — does the diff implement what the change *intends*, and does it respect the domain's invariants? No other reviewer reads intent; this one does nothing else.
+
+**Intent sources are in your envelope** (PR description, linked PRD/Notion card, commit messages). They are authoritative and exhaustive — never infer intent beyond them. If all sources are empty, restrict yourself to internal-consistency checks (items 3–6) and add a note: "no intent source available".
+
+Analyze (diff-scoped only):
+
+1. **Intent coverage** — map each requirement / acceptance criterion stated in the intent sources to the code that implements it. Flag a requirement with **no implementing code** (forgotten case) and code whose behavior **contradicts** a stated requirement (e.g. PRD says "calculé automatiquement", diff adds a manual input). Quote the intent line in the evidence.
+2. **Scope drift** — behavior the diff ships that no intent source asked for *and* that changes user-visible rules (a new restriction, an altered default). Phrase as a question, severity `warning` at most.
+3. **State transitions** — for any status/state enum the diff touches: are all transitions the code allows valid in the domain (no `Terminé → En cours` style jumps unless intended)? Are all existing states handled in new `switch`/`if` chains the **diff itself adds**? A new state whose *pre-existing* consumers were not updated is the regression reviewer's finding — do not re-flag those sites; you own only domain-invalid transitions and unhandled cases inside new code.
+4. **Calculations & units** — money, quantities, percentages, dates the diff computes: rounding mode and place (round once at the end vs per-step), cents↔euros conversions, inclusive/exclusive date boundaries (`<` vs `<=` on an end date), timezone-sensitive comparisons, division by a value that can be zero in the domain.
+5. **Role/permission rules** — when an intent source states a role/ownership rule: is it enforced on **both** sides (a backend filter the frontend also respects, and vice versa)? Is the *same* predicate used, or two hand-written variants that can drift? A plain missing auth guard with no stated role rule is the security reviewer's — skip it.
+6. **Cross-layer rule coherence** — the same business rule expressed twice (Zod schema bound vs DB constraint vs UI validation, a filter in the query vs a filter in the component): flag when the diff changes one expression and not the others. Cite both `file:line`.
+
+Method: read the intent sources first, build the requirement list, then walk the diff against it. For invariants (items 3–6), the establishing evidence is a sibling `file:line` (the enum definition, the other side of the contract, the duplicated rule) — open files outside the patch for this context when needed.
+
+Ignore: technical edge-cases with no domain meaning (quality), consumer blast radius (regression), security exploits & plain missing auth guards (security), style (conventions).
+
+Severity: `critical` = the diff ships behavior that contradicts a stated requirement or breaks a domain invariant (wrong calculation, invalid transition, rule enforced on one side only). `warning` = a stated requirement with no visible implementation, or two expressions of one rule left able to drift. `nit` = unclear intent worth a question.
+
+Anti-hallucination (STRICT — this section lives or dies on precision): every finding carries its evidence — a contradiction quotes the intent line it violates; a missing implementation quotes the unimplemented requirement line; a scope-drift question quotes the diff hunk and states that no intent source covers it; an invariant break cites the sibling `file:line` that establishes the invariant. No "the feature should probably". No domain knowledge imported from outside the repo + intent sources. A diff that is pure refactoring with no intent source → `status: "ok"`, note it, zero findings is a valid outcome.
 
 ---
 
@@ -149,7 +185,7 @@ Checklist (apply per changed file; skip what does not apply):
 10. **Financial / payment** **[needs payments]** (HIGH STAKES) — for Stripe/payment flows: do NOT mark an order `paid`/`completed` before payment is confirmed (`checkout.session.completed` can fire before payment for some methods — verify `payment_status`); webhook idempotency; amount + currency verification; pinned `apiVersion`; signature verification on webhooks.
 11. **Dependency risk** — a new `package.json` entry: flag for justification + maintenance check.
 
-Ignore: cleanliness without security impact (quality), architecture taste (architecture), naming (conventions), blast radius (regression).
+Ignore: cleanliness without security impact (quality), architecture taste (architecture), naming (conventions), blast radius (regression), two-sided coherence of a *stated* business role rule (logic reviewer — you still own plain missing guards).
 
 Severity: `critical` = exploitable today by an unauthenticated or low-privilege user, or direct financial loss. `warning` = defense-in-depth gap. **Never** use `nit` for security findings. Every finding quotes the unsafe pattern literally (1–3 lines). No "consider rate limiting" without a concrete abuse vector.
 

@@ -61,7 +61,7 @@ Rules: summary counts == findings split by severity, exactly. Omit line/end_line
 | Field | Type | Required | Rule |
 |---|---|---|---|
 | `id` | string | yes | Stable, unique. `<section>.<category>.<slug>` |
-| `section` | enum | yes | `quality` \| `architecture` \| `regression` \| `security` \| `conventions` |
+| `section` | enum | yes | `quality` \| `architecture` \| `regression` \| `security` \| `conventions` \| `logic` |
 | `severity` | enum | yes | `critical` \| `warning` \| `nit` |
 | `category` | string | yes | Agent-defined (e.g. `duplication`, `i18n`, `injection`, `signature-change`) |
 | `title` | string | yes | Short normalized title (used for dedupe) |

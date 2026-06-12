@@ -61,7 +61,42 @@ monorepo=off; [ -f "$ROOT/turbo.json" ] || [ -f "$ROOT/turbo.jsonc" ] || [ -f "$
 echo "i18n=$i18n frontend=$frontend react=$react payments=$payments monorepo=$monorepo"
 ```
 
-Pass the result into the dispatch envelope's **Project capabilities** slot. Reviewers read it and skip off-capability checks. When detection is ambiguous, default the flag **off** and note it — a missed i18n flag is recoverable; a wave of false "hardcoded text" findings on a non-i18n repo destroys trust in the report.
+## Stack manifest (libs for the quality reviewer's library check)
+
+Detect which libraries from `library-practices.md` the repo actually uses, with the **major
+version** when the checklist is version-sensitive (zod v3 vs v4). One pass over the manifests:
+
+```bash
+LIBS=""
+for lib in zod @tanstack/react-query drizzle-orm prisma @elysiajs/eden @trpc/client react-hook-form; do
+  spec=$(rg --no-filename -o "\"$lib\"\s*:\s*\"[^\"]+\"" \
+        "$ROOT"/package.json "$ROOT"/apps/*/package.json "$ROOT"/packages/*/package.json 2>/dev/null | head -1)
+  [ -z "$spec" ] && continue
+  # "catalog:" / "workspace:*" specs have no digit — keep the lib, versionless
+  v=$(echo "$spec" | rg -o ':\s*"[^"]*?([0-9]+)' -r '$1' | head -1)
+  case $lib in
+    @tanstack/react-query) name=tanstack-query ;;
+    @elysiajs/eden)        name=eden ;;
+    @trpc/client)          name=trpc ;;
+    drizzle-orm)           name=drizzle ;;
+    *)                     name=$lib ;;
+  esac
+  LIBS="$LIBS $name${v:+@$v}"
+done
+echo "libs=$(echo $LIBS | tr ' ' ',')"
+```
+
+The emitted names match the section titles in `library-practices.md` — that mapping is what the
+orchestrator uses to pick which sections to paste. A versionless entry (pnpm `catalog:` /
+`workspace:*` spec) still gets its checklist; resolve the real version from
+`pnpm-workspace.yaml`'s catalog when present, otherwise the reviewer leans on context7 for
+version-sensitive items.
+
+Pass the result into the envelope's **Stack manifest** slot, and paste the matching
+`library-practices.md` sections (detected libs only) into the **quality** dispatch. A lib absent
+from the manifest gets no checklist — its idioms must not be checked.
+
+Pass the capability flags (§Capability detection above) into the dispatch envelope's **Project capabilities** slot. Reviewers read it and skip off-capability checks. When detection is ambiguous, default the flag **off** and note it — a missed i18n flag is recoverable; a wave of false "hardcoded text" findings on a non-i18n repo destroys trust in the report.
 
 ## Banned-pattern grep (ripgrep over changed files)
 

@@ -2,7 +2,7 @@
 
 Optional last-mile step. Argus is read-only by default; `--post` (or "poste les findings sur la PR") publishes them as **inline review comments** via `gh`. This is the step the user otherwise does by hand on nearly every review.
 
-**Posting publishes to GitHub — outward-facing. Confirm the target PR# with the user before posting.** Default to `event: "COMMENT"` (never auto-`REQUEST_CHANGES`/`APPROVE` — the human curates the verdict).
+**Posting publishes to GitHub — outward-facing. Resolve the target PR# yourself and announce it** ("posting to PR #113") — an explicit number in the prompt wins; otherwise auto-resolve from the branch (§Resolve target). Ask the user **only** when no open PR exists or several candidates match — making the user re-run with the number is the friction this skill exists to remove. Default to `event: "COMMENT"` (never auto-`REQUEST_CHANGES`/`APPROVE` — the human curates the verdict).
 
 ## The one mechanism: a single PR *review* with inline comments
 
@@ -81,17 +81,24 @@ Map each anchored finding to a comment object: `path`, `line`, `side: "RIGHT"`, 
 }
 ```
 
-- **Comment body convention:** `**[severity] section** — <evidence>. <recommendation>`. Evidence + fix only; no preamble.
+- **Comment body convention:** `**[severity] section** — <evidence>. <recommendation>`. Evidence + fix only; no preamble. **English only** (the report language, regardless of the PR's language). **Never expose the internal fan-out** in a posted comment — no "the logic reviewer rated this critical", no internal confidence levels; the finding stands on its evidence alone.
 - **Body when every finding anchored inline:** verdict line + counts table only — omit the "Off-diff" section entirely. Keep it short.
 
-## Avoid duplicate comments on re-runs
+## Dedupe against ALL existing threads — humans and bots, not just argus re-runs
 
-The user re-runs Argus on updated branches. Before posting, pull existing review comments and skip findings already commented at the same `path:line`:
+Before posting, pull every existing comment on the PR (inline review comments + conversation comments, **all authors** — the PR author, human reviewers, gemini-code-assist, codex):
 
 ```bash
-gh api "repos/$OWNER_REPO/pulls/$PR/comments" --paginate \
-  --jq '.[] | "\(.path):\(.line)"' | sort -u
+gh api "repos/$OWNER_REPO/pulls/$PR/comments" --paginate --jq '.[] | "\(.user.login) \(.path):\(.line) :: \(.body)"'
+gh api "repos/$OWNER_REPO/issues/$PR/comments" --paginate --jq '.[] | "\(.user.login) :: \(.body)"'
 ```
+
+Then for each finding:
+
+1. **Same `path:line` already commented (any author)** → skip.
+2. **Same topic on the same file already raised by anyone** (semantic match, not just line-exact — e.g. a human already flagged the hardcoded FR labels) → do NOT repost it as a fresh finding. Either skip it, or if argus adds material evidence (extra occurrences, a concrete fix), **reply referencing the existing thread** ("extends @user's point above: …") instead of opening a duplicate.
+
+Reposting a point a human already made — especially the PR's own reviewer — reads as "the bot didn't read the thread" and tanks trust in the whole batch (real incident: sofrapa #112, argus duplicated the user's own earlier comment → "pk tu répètes, ta pas lu ou quoi ?"). Building on an existing thread with credit (sofrapa #103, gemini overlap acknowledged in the finding) is the correct pattern.
 
 ## Post
 
@@ -101,6 +108,8 @@ gh api "repos/$OWNER_REPO/pulls/$PR/reviews" --method POST --input /tmp/argus_re
 ```
 
 Confirm `inline` > 0 (unless the only findings were genuinely off-diff). If it is 0 while findings exist, the lines did not anchor — re-check line-validation before falling back to the body.
+
+**Count-consistency check (mandatory):** the counts table in the review `body` must equal *posted inline comments + off-diff bullets actually listed in the body*, after dedupe drops. A summary that announces "1 warning + 3 nits" while only 1 inline comment exists is a posting bug (real incident: fftir #233/#238) — recount after dedupe/line-validation and rebuild the body table from the final `comments[]` + off-diff list, never from the pre-posting report.
 
 ## Failure handling
 
