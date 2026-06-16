@@ -35,6 +35,7 @@ npx skills add Antune-L/skillzer/skills/audit-agents-skills
 npx skills add Antune-L/skillzer/skills/branch-summary
 npx skills add Antune-L/skillzer/skills/code-review
 npx skills add Antune-L/skillzer/skills/coding-convention
+npx skills add Antune-L/skillzer/skills/minos-pr-feedback
 npx skills add Antune-L/skillzer/skills/plan-review
 npx skills add Antune-L/skillzer/skills/prd
 npx skills add Antune-L/skillzer/skills/regression-check
