@@ -27,7 +27,7 @@ Do **not** strip (review normally, but conventions reviewer skips their import-o
 BASE=<base>; BRANCH=<branch>          # or use --cached for staged
 git diff --name-only "$BASE...$BRANCH" \
   | grep -vE '\.(lock|snap)$|snapshot\.json$|\.gen\.ts$|/paraglide/|/generated/|/dist/|/\.turbo/' \
-  > /tmp/argus_files.txt
+  > "$ARGUS_TMP/files.txt"   # $ARGUS_TMP = the run's mktemp -d dir from SKILL.md step 2
 ```
 
 ## Capability detection (run once, gate the folded checks)
@@ -103,7 +103,7 @@ Pass the capability flags (§Capability detection above) into the dispatch envel
 Run each over the changed-file set. Keep only hits on **added/modified** lines — cross-check against the patch; a hit on an unchanged context line is pre-existing, skip it. Record `file:line:matched-pattern` for the seed list.
 
 ```bash
-FILES=$(cat /tmp/argus_files.txt)
+FILES=$(cat "$ARGUS_TMP/files.txt")
 
 # Type casts (exclude import-alias `import { x as y }` and JSX) — most-cited ban
 rg -n --no-heading -e '\)\s+as\s+\w' -e '\]\s+as\s+\w' -e '\b\w+\s+as\s+(const\b|unknown\b|any\b|[A-Z]\w*)' $FILES \

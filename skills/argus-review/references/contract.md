@@ -82,6 +82,7 @@ Rules: summary counts == findings split by severity, exactly. Omit line/end_line
 - Partial review → `status: "partial"` + `coverage: "partial"` + `errors[]` explaining why.
 - Hard failure → `status: "error"` + `coverage: "not-run"` + `errors[]` with cause.
 - Security section never uses `severity: "nit"`.
+- `notes[]` entries are context, never findings: "could not verify" / "`<url>` — not rendered" / other unverified-gap items must not appear in `findings[]` nor inflate `summary` counts — the orchestrator will not post them as comments.
 
 ## Token budget
 
