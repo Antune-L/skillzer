@@ -33,7 +33,8 @@ gh api "repos/$OWNER_REPO/issues/$PR/comments" --paginate --jq '
 Notes:
 - `position == null` on an inline comment ⇒ the line is **outdated** (the diff moved past it) — usually already addressed; down-weight or skip.
 - `in_reply_to_id` set ⇒ part of a thread; read the whole thread before judging (a later reply may resolve it).
-- To detect **resolved** threads (not exposed by the REST inline endpoint), use the GraphQL review-thread query when resolution matters:
+- **Always also run the GraphQL review-thread query** — the REST inline endpoint does NOT expose
+  thread resolution, so skipping this step silently disables the "skip resolved threads" filter:
 
 ```bash
 gh api graphql -f query='
@@ -71,6 +72,12 @@ Standing defaults (the user's repeated instructions):
 - **"pas les nit"** → `skip-nit` is the default; never apply nits unless told.
 - **Bots (`gemini-code-assist`, `coderabbitai`) are nitty** — they pad a few real findings with many style nits and speculative suggestions. Judge each on merits; a bot's confident tone is not evidence. Expect most bot comments to land in `skip-nit`.
 
+**Consult the rejected-patterns memory** ([`rejected-patterns.md`](rejected-patterns.md)) before
+triaging: a comment matching a listed pattern defaults to its recorded verdict (still overridable
+on strong evidence). After the run, if a *class* of comment was skipped for the same reason on
+this PR and at least one earlier PR, append it to the file — one line: pattern → verdict → reason.
+Never log one-off skips; only recurring classes.
+
 ## 5. Present, then apply
 
 1. **Print the triage table first** — `author · path:line · verdict · one-line reason` — so the user sees the call on each comment.
@@ -79,7 +86,21 @@ Standing defaults (the user's repeated instructions):
    - reuse existing project components/patterns (don't reinvent),
    - respect conventions (no `as` casts, naming, import order),
    - **check regressions** on any changed symbol and run typecheck/lint on touched files.
-3. **Do not auto-reply or resolve threads** — standing instruction: "pas besoin de répondre, applique ce qui te semble pertinent". Only post replies if explicitly asked; then reply per-thread via `gh api repos/$OWNER_REPO/pulls/$PR/comments/<id>/replies`.
+3. **Do not auto-reply or resolve threads** — standing instruction: "pas besoin de répondre, applique ce qui te semble pertinent".
+
+### `--reply` (opt-in only)
+
+When the user explicitly asks to answer the reviewers (`--reply`, "réponds aux commentaires",
+"résous les threads traités"):
+
+- For each **applied** comment: reply in-thread via
+  `gh api repos/$OWNER_REPO/pulls/$PR/comments/<id>/replies -f body="Fixed in <sha>."` (one line,
+  factual, link the commit), then resolve the thread via GraphQL `resolveReviewThread`
+  (`thread_id` from the reviewThreads query in §2).
+- For each **skip-wrong** comment: reply with the one-line reason from the triage table — polite,
+  no debate. Do NOT resolve the thread (the reviewer decides).
+- **skip-nit** comments get no reply — silence is the answer to a nit.
+- Never reply to bot summary reviews (the overview posts), only to inline threads.
 
 ## 6. Commit and push the applied fixes
 

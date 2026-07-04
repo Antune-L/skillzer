@@ -2,8 +2,9 @@
 
 Static, version-aware checklists for the **quality** reviewer's folded library check. The
 orchestrator detects the stack from `package.json` (see `mechanical-checks.md` §Stack manifest)
-and pastes **only the detected libs' sections** into the quality envelope. A lib that is not in
-the manifest must never be checked — its idioms don't apply.
+and passes this file's absolute path in the quality envelope; the reviewer reads it and applies
+**only the detected libs' sections**. A lib that is not in the manifest must never be checked —
+its idioms don't apply.
 
 **Static first, context7 on doubt.** These checklists are the deterministic baseline. When the
 reviewer is unsure whether an API form is current for the *detected major version*, it queries the
@@ -61,6 +62,20 @@ stylistic lib idioms.
 - **Drizzle**: prefer the relational `db.query.*.findMany({ with })` API over hand-assembled
   joins when relations are defined; **Prisma**: beware implicit `findUnique` null — handle the
   null path.
+- **Migration hygiene — never hand-write what the generator owns** (real incident: sofrapa
+  #155/#166/#176/#190 hand-written SQL-only migrations desynced Drizzle snapshots and broke
+  replay from an empty DB; repaired in #196/#198). The mechanical pre-pass seeds the structural
+  signals (see `mechanical-checks.md` §ORM migration hygiene); this reviewer judges them:
+  - **Drizzle**: every new migration comes from `drizzle-kit generate` — `migration.sql` and its
+    snapshot state (per-dir `snapshot.json` or `meta/_journal.json` entry) commit together. An
+    SQL-only migration is a `warning`; a schema change with no regenerated migration is drift.
+  - **Prisma**: new migrations come from `prisma migrate dev` — the `schema.prisma` change and
+    `prisma/migrations/<ts>_*/migration.sql` land in the same PR; one without the other is drift.
+  - **Editing an already-merged migration is `critical`** — it may be applied to shared/prod
+    databases; the fix is a new forward migration, never a rewrite of history.
+  - Manual DDL executed directly against a database is invisible in a diff — when snapshot drift
+    appears with no migration explaining it, flag the gap and recommend a CI replay/drift check
+    (`drizzle-kit check` / regenerate-and-fail-on-diff) rather than guessing.
 
 ## eden treaty / trpc (type-safe API clients)
 

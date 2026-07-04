@@ -44,11 +44,11 @@ Full `gh` commands and the triage rubric: [`references/procedure.md`](references
    - review summaries + state (`/pulls/{PR}/reviews`),
    - top-level conversation comments (`/issues/{PR}/comments`).
 3. **Drop noise** — skip comments on resolved threads, `outdated`/superseded lines, and the user's own. Bots (`gemini-code-assist`, `coderabbitai`, …) post a verbose summary + many inline nits — judge each on merits, not by volume.
-4. **Triage each surviving comment** into `apply` / `skip-nit` / `skip-wrong`, each with a one-line reason (rubric in `procedure.md`). Default: only `apply` the genuinely pertinent; **nits are skipped** unless the user said otherwise.
+4. **Triage each surviving comment** into `apply` / `skip-nit` / `skip-wrong`, each with a one-line reason (rubric in `procedure.md`). Consult [`references/rejected-patterns.md`](references/rejected-patterns.md) first — recurring comment classes carry a default verdict; append new recurring classes after the run. Default: only `apply` the genuinely pertinent; **nits are skipped** unless the user said otherwise.
 5. **Present the triage table first** (comment → verdict → reason), then **apply the `apply` set** as real code changes — grouped, smallest diff, reusing existing project patterns.
 6. **Check regressions** on changed symbols (per the user's workflow) and run typecheck/lint on touched files.
 7. **Commit + push the applied fixes** — stage only the files minos touched, commit with a conventional message, and push to the PR's head branch so the PR updates. Only after checks pass; skip entirely if nothing was applied or if a check failed. See [`references/procedure.md`](references/procedure.md) §6.
-8. **Do not auto-reply or resolve threads** unless asked — the standing instruction is "pas besoin de répondre, applique ce qui te semble pertinent".
+8. **Do not auto-reply or resolve threads** unless asked — the standing instruction is "pas besoin de répondre, applique ce qui te semble pertinent". When the user does ask (`--reply`, "réponds aux commentaires"), follow [`references/procedure.md`](references/procedure.md) §`--reply`: reply in-thread + resolve for applied fixes, one-line factual reply (no resolve) for skip-wrong, silence for nits.
 9. **Report**: what was applied (file:line), what was skipped and why (nit / out-of-scope / wrong), counts, and the pushed commit sha.
 
 ## Gotchas
@@ -56,7 +56,7 @@ Full `gh` commands and the triage rubric: [`references/procedure.md`](references
 - **Three comment APIs, not one.** Inline comments, review summaries, and conversation comments are separate endpoints. "J'ai des retours" can land in any of them — fetch all three or miss feedback.
 - **PR# is derivable — never ask.** Resolve from the branch; the user routinely doesn't know it ("67 j'imagine"). Verify a user-given number against the branch.
 - **Bots are nitty.** `gemini-code-assist` / `coderabbitai` mix a few real findings into many nits and style preferences. Triage on merits; the user wants "ce qui est pertinent", not all of it.
-- **Skip resolved/outdated threads.** Re-fixing a resolved comment is noise. Filter on thread resolution + `outdated`/`position: null`.
+- **Skip resolved/outdated threads.** Re-fixing a resolved comment is noise. Thread resolution is GraphQL-only (`reviewThreads.isResolved`) — the REST inline endpoint does not expose it, so the GraphQL query in `procedure.md` §2 is mandatory, not optional. Outdated = `position: null`/`isOutdated`.
 - **Don't auto-reply, don't post comments.** Never publish review comments back to the PR (that is `argus-review --post`). Committing + pushing the fixes is separate and expected — it updates the PR diff, it does not post conversation.
 - **Apply respects project conventions.** Fixes are real code — reuse existing components/patterns, no `as` casts, minimal diff, check regressions (same standards as any code change).
 - **Heavy commit hooks ≠ stuck commit — never `--no-verify`.** Some repos (e.g. fftir-thot's lefthook) run `pnpm i --frozen-lockfile` + full-monorepo turbo lint/format/check-types on pre-commit: several minutes, longer than the default 2-min Bash timeout. Run `git commit` with `timeout: 600000` (or `run_in_background`) and wait. Do NOT kill lefthook/turbo processes, do NOT fall back to `--no-verify` (it also skips commitlint and transcrypt). If the hook genuinely fails, report the failure instead.

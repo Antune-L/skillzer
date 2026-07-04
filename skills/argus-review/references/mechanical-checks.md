@@ -144,6 +144,60 @@ rg -n --no-heading -e '\b(TODO|FIXME|NOTE)\b' $FILES | rg -v 'TODO\(ali\)|FIXME\
 
 Adapt patterns to the repo's actual rules (read `CLAUDE.md`/`AGENTS.md`/`docs` first). If the repo bans different things, grep those instead — the pass is a template, not a fixed law.
 
+## ORM migration hygiene — ONLY IF `drizzle` or `prisma` in the stack manifest
+
+Hand-written migrations bypass the ORM's generator and desync its snapshot/journal state (real
+incident: sofrapa #155/#166/#176/#190 shipped SQL-only Drizzle migrations without snapshots →
+history no longer replayable from an empty DB, repaired in #196/#198).
+
+**Run this on the RAW `git diff --name-status` output, never on `files.txt` or the stripped
+patch** — the ignore list above strips `**/snapshot.json`, so a missing/present snapshot is
+invisible to reviewers; only this pre-pass can see it.
+
+```bash
+git diff --name-status "$BASE...$BRANCH" > "$ARGUS_TMP/name-status.txt"
+
+# --- Drizzle (skip unless drizzle in LIBS) ---
+# 1. Migration added without its generated sibling snapshot (hand-written migration)
+#    Layouts vary: per-dir snapshot.json (this repo) OR a meta/_journal.json entry — accept either.
+for sql in $(rg '^A\s' "$ARGUS_TMP/name-status.txt" | rg -o '\S*migrations/.*/migration\.sql$'); do
+  dir=$(dirname "$sql")
+  rg -q "^A\s+$dir/snapshot\.json" "$ARGUS_TMP/name-status.txt" \
+    || rg -q 'migrations/meta/_journal\.json' "$ARGUS_TMP/name-status.txt" \
+    || echo "$sql — added without generated snapshot/journal → hand-written migration candidate (warning)"
+done
+
+# 2. Already-committed migration MODIFIED (not added) — may be applied elsewhere (critical candidate)
+rg '^M\s+\S*migrations/.*\.(sql|json)$' "$ARGUS_TMP/name-status.txt"
+
+# 3. Drizzle schema changed but no migration in the diff — missing generation candidate
+#    Low-confidence: type-only / relations-only edits legitimately need no migration.
+if rg -q '^[AM]\s+\S*(schema|schemas)/.*\.ts$' "$ARGUS_TMP/name-status.txt" \
+   && ! rg -q 'migrations/' "$ARGUS_TMP/name-status.txt"; then
+  echo "schema changed with no migration in diff — verify a migration was generated (low-confidence)"
+fi
+
+# --- Prisma (skip unless prisma in LIBS) ---
+# schema.prisma and prisma/migrations/<ts>_*/migration.sql must land together; one without the
+# other is drift. A MODIFIED migration.sql is the critical case, same as Drizzle #2.
+rg '^M\s+\S*prisma/migrations/.*migration\.sql$' "$ARGUS_TMP/name-status.txt"
+if rg -q '^M\s+\S*schema\.prisma$' "$ARGUS_TMP/name-status.txt" \
+   && ! rg -q '^A\s+\S*prisma/migrations/' "$ARGUS_TMP/name-status.txt"; then
+  echo "schema.prisma changed with no new migration — verify prisma migrate dev was run (low-confidence)"
+fi
+```
+
+Corroboration heuristic (never a finding on its own): drizzle-kit names migration dirs with a
+random codename (`20260701102242_unique_lila_cheney`); a descriptive slug on a round timestamp
+(`20260701120000_add_order_item_status_history`) suggests hand-authoring — mention it as
+supporting evidence when signal 1 fires.
+
+Seed the hits to the **conventions** reviewer like the banned-pattern hits; the **quality**
+reviewer owns the judgment side via `library-practices.md` §drizzle/prisma → Migration hygiene.
+Severity: hand-written/missing-snapshot → `warning`; modified already-merged migration →
+`critical` candidate (it may already be applied to shared databases); the two low-confidence
+checks are questions for the reviewer to resolve, `nit` at most if unresolved.
+
 ## i18n hardcoded-text candidates (heuristic) — ONLY IF `i18n=on`
 
 **Skip this entire section when `i18n=off`.** On a project with no translation system, hardcoded user-facing strings are not a violation — running it produces only noise.

@@ -1,6 +1,8 @@
 # Reviewer dimensions — self-contained methodology
 
-Each block below is the **complete** instruction set for one reviewer. The orchestrator pastes the relevant block verbatim into a `general-purpose` subagent's prompt. The subagent has **no skill loaded** — this block is all it gets. Do not reference external skills or files from inside a dispatched prompt.
+Each block below is the **complete** instruction set for one reviewer. The subagent has **no skill loaded** — it gets its instructions by **reading this file itself** (the orchestrator passes the absolute path in the dispatch prompt; this saves re-pasting ~N× the same methodology as expensive parent output tokens). Everything still lives inside `argus-review/references/` — no external skill or file outside the skill folder may be referenced from a dispatched prompt.
+
+Each reviewer must apply, from this file: the **shared reviewer rules** (§Shared reviewer rules below), the **Anti-noise / Severity discipline / Intentional changes / Project signals** blocks, and **ONLY the one dimension section it owns**. The other dimension sections are out of its scope.
 
 Folded coverage: **conventions** also owns i18n/hardcoded-text; **quality** also owns error-handling, accessibility, performance, React anti-patterns, file size & inline-type extraction, and library API best-practices (per-lib checklists in [`library-practices.md`](library-practices.md)); **logic** owns business intent and domain invariants.
 
@@ -8,11 +10,18 @@ Folded coverage: **conventions** also owns i18n/hardcoded-text; **quality** also
 
 ## Dispatch envelope (shared)
 
-Wrap every dimension block in this envelope. Fill the scope, paste the pre-computed diff, paste the dimension block, paste the compact contract.
+The dispatch prompt is **short by design**: it carries only the run-specific data (scope, flags, stat, seed list, intent sources) plus **absolute paths** to this file, the contract, and the pre-computed diff. The reviewer reads those files itself — the orchestrator never pastes the diff, the methodology, or the contract into a prompt.
 
 ```
-You are a read-only PR reviewer. Review ONLY the changed code in the diff below.
-Apply the METHODOLOGY block exactly. Return ONE JSON object and nothing else.
+You are a read-only PR reviewer.
+
+FIRST, read these files — together they are your COMPLETE instructions:
+1. <SKILL_DIR>/references/dimensions.md — apply §Shared reviewer rules, the Anti-noise / Severity discipline / Intentional-changes / Project-signals blocks, and ONLY the §<section> methodology block (ignore the other dimension sections).
+2. <SKILL_DIR>/references/contract.md §Compact schema — the exact JSON shape you must return.
+3. <ARGUS_TMP>/diff.patch — the full pre-computed diff. It is AUTHORITATIVE: do NOT re-run git diff; open repo files only for context outside the patch window.
+<quality only> 4. <SKILL_DIR>/references/library-practices.md — apply ONLY the sections matching the libs in the Stack manifest below; ignore the rest.
+
+Review ONLY the changed code in the diff. Return ONE JSON object and nothing else.
 
 Scope:
 - Repository (absolute path): <path>
@@ -28,30 +37,21 @@ Project capabilities (a check tagged [needs <flag>] runs ONLY if its flag is on)
 Changed files (<N> files, +<X> / -<Y>; generated/lock/snapshot already stripped):
 <git diff --stat output>
 
-Full patch (AUTHORITATIVE — do NOT re-run git diff; open files only for context outside this window):
-```diff
-<git diff output>
-```
-
 <conventions only> Mechanical pre-pass candidates to verify first, then extend:
 <seed list: file:line + matched banned pattern>
-
-<quality only> Library best-practice checklists for the detected stack (from library-practices.md, detected libs only):
-<paste the matching per-lib sections>
 
 <logic only> Intent sources (AUTHORITATIVE — do not invent intent beyond these):
 - PR title + description: <gh pr view output, or "none">
 - Linked PRD / Notion card content: <if the PR body references one, or "none">
 - Mockup / screenshot spec (Figma + PR images, distilled to text by the parent): <compact spec per source — fields, labels, actions, states, explicit values; or "<url> — not rendered"; or "none">
 - Commit messages: <git log base..branch subjects+bodies>
+```
 
-=== METHODOLOGY ===
-<paste the matching dimension block below>
+`<SKILL_DIR>` = the absolute path of the `argus-review` skill folder (the folder containing this file's `references/` parent). `<ARGUS_TMP>` = the run's `mktemp -d` scratch dir. Both must be spelled out literally in every dispatch — subagents inherit no env.
 
-=== OUTPUT CONTRACT (compact) ===
-<paste references/contract.md §Compact schema>
+## Shared reviewer rules
 
-Rules:
+Every reviewer applies these on top of its dimension block:
 - JSON only. No prose, no markdown fences around the object.
 - Every finding cites file:line with one concrete evidence sentence. No intuition-only findings.
 - Evidence-source rule: if a critical/warning hinges on a third-party library's runtime behavior (not on code visible in this repo — e.g. "this better-auth plugin is unsafe in prod"), verify against the lib's current docs (context7 MCP) and cite the doc passage in the finding. Unverifiable → downgrade to nit phrased as a question, or drop. An unsourced lib-behavior critical is parole-contre-parole and gets dismissed.
@@ -61,7 +61,6 @@ Rules:
 - summary counts MUST equal findings split by severity, exactly.
 - No findings → status "ok", coverage "complete", zero counts, empty findings/errors.
 - Token budget: 3000 tokens total (JSON only).
-```
 
 **Anti-noise (applies to every reviewer):** do NOT flag what this team treats as non-issues — defensive type-guard / `.filter` narrowing, routine pagination edge-cases, autogenerated `components/ui/*`, generated files, extract-helper/dedup suggestions on small twins (≲30 lines, 2 occurrences — dismissed "not worth"/"no biggie": fftir #311/#312), edge-cases the library already handles natively (verify in the lib's docs before flagging — e.g. TanStack Table default columns, fftir #311), and an invariant borrowed from a sibling hook/component applied to a context where the author deliberately diverged (fftir #327 → reverted as "slop feedback"). If unsure it is real, drop to `nit` or skip.
 
@@ -99,7 +98,7 @@ Analyze (diff-scoped only):
 8. **React anti-patterns** **[needs react]**: `useEffect` used for state derivation/sync that should be computed during render or in an event handler; stale closures; effect without justification; a custom hook that merely renames/wraps a React primitive with no added behavior (see "Zero-value wrappers" under item 3 — e.g. `useMountEffect` = `useEffect(fn, [])`).
 9. **Oversized files** — a file the diff **creates or grows past ~400 lines** that accretes multiple responsibilities (the classic case: a `*.service.ts` / controller bundling unrelated helpers) should be split into focused modules — extract cohesive helpers into a `*.utils.ts` / dedicated file rather than overloading one. **Only flag when the diff is responsible for the growth** (don't flag a pre-existing long file the diff barely touches), and cite the resulting line count + the suggested split axis (which group of functions moves out). A long-but-cohesive file (a single big switch, generated schema, one logical unit) is at most a `nit`. Default `warning`; `nit` if the overflow is marginal or the file is cohesive.
 10. **Inline type literals in signatures** — a function or component whose signature inlines a large object-type literal (roughly **5+ properties**, or a multi-line inline literal) should extract a **named `Props`/params type or interface** so the file reads clearly and the type is reusable. Flag at the signature `file:line`; suggest the named type. Default `nit`; `warning` only for clearly large/repeated inline literals. **Skip** trivial 1–4 field inline types and one-off internal callbacks.
-11. **Library API best-practices** **[needs lib in stack manifest]** — apply the per-lib checklist pasted in your envelope (only the detected libs). Flag misuse of a library the diff touches: deprecated API forms, error-prone patterns the lib documents against, reimplementing what the lib provides. The checklist is the baseline, not a ceiling — extend it with documented best practices you are *certain* apply to the detected version. **When unsure whether an API is current for the detected version, query the context7 MCP for that lib's docs instead of flagging from memory** — a flag based on a stale version is a false positive. Severity: `warning` for error-prone misuse (silent failure, throw at boundary), `nit` for stylistic lib idioms.
+11. **Library API best-practices** **[needs lib in stack manifest]** — read `library-practices.md` (path in your envelope) and apply the per-lib checklists for the detected libs only. Flag misuse of a library the diff touches: deprecated API forms, error-prone patterns the lib documents against, reimplementing what the lib provides. The checklist is the baseline, not a ceiling — extend it with documented best practices you are *certain* apply to the detected version. **When unsure whether an API is current for the detected version, query the context7 MCP for that lib's docs instead of flagging from memory** — a flag based on a stale version is a false positive. Severity: `warning` for error-prone misuse (silent failure, throw at boundary), `nit` for stylistic lib idioms.
 
 Ignore: security (security reviewer), cross-package architecture (architecture reviewer), blast radius (regression reviewer), mechanical bans + i18n + naming (conventions reviewer), business intent (logic reviewer).
 

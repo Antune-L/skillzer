@@ -17,6 +17,18 @@ BEFORE committing. Maps the blast radius of changes and flags unhandled consumer
 - After changing database schema or migrations
 - After modifying shared utilities, hooks, or components
 
+**Mandatory (not optional) when a shared-surface file changes.** A shared surface is any file
+imported by many features. Detect it per project rather than assuming a layout:
+
+- Typical candidates: `components/ui|form|table|layout`, `hooks/`, `lib/`, `utils/`, shared
+  packages (`packages/*` in a monorepo).
+- When in doubt, count importers: `grep -rl "from ['\"].*<module>" --include="*.ts*" | wc -l` —
+  more than ~3 importers ⇒ treat as shared surface.
+- If the project defines its own shared-surface rule (e.g. a `.cursor/rules/*.mdc` or CLAUDE.md
+  section), honor it — but never require it to exist.
+
+A one-feature edit to a shared surface is the most common regression source.
+
 ## Process
 
 ### Phase 1 — Identify What Changed
@@ -35,12 +47,27 @@ For each changed file, extract:
 
 ### Phase 2 — Map the Blast Radius
 
-For each changed symbol, find ALL consumers:
+For each changed symbol, find ALL consumers. Use the most precise source available, in order:
 
-```
-grep -r "import.*{.*symbolName.*}" --include="*.ts" --include="*.tsx"
-grep -r "from ['\"].*changedModule['\"]" --include="*.ts" --include="*.tsx"
-```
+1. **Knowledge graph** — if `graphify-out/graph.json` exists, the dependency edges are already
+   computed: `graphify query "who imports/uses <symbol or module>?"` (or `graphify path` between
+   the changed module and a suspected consumer). Start here; it catches re-exports and barrel
+   files that regex misses.
+2. **Compiler / LSP** — exact reference resolution beats text matching:
+   - LSP "find references" on the changed symbol when available.
+   - Or run the project's typecheck (`tsc --noEmit` / the `typecheck` script from `package.json`)
+     after the change — every consumer broken by a signature/shape change surfaces as an error
+     with file:line. This is the ground truth for TS projects.
+3. **Grep fallback** — only when neither is available, or to catch non-TS references
+   (route strings, config, docs):
+
+   ```
+   grep -r "import.*{.*symbolName.*}" --include="*.ts" --include="*.tsx"
+   grep -r "from ['\"].*changedModule['\"]" --include="*.ts" --include="*.tsx"
+   ```
+
+   Regex misses default imports, re-exports, and barrel files (`index.ts` chains) — when using
+   this fallback, explicitly check barrels that re-export the changed module.
 
 Trace transitively — if A imports B which imports changed module C, check both A and B.
 

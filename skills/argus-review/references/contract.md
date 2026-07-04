@@ -1,10 +1,10 @@
 # Reviewer output contract
 
-Single source of truth for the JSON every reviewer returns. **Self-contained** — does not reference any other skill. The orchestrator pastes the §Compact schema into each dispatch prompt and validates replies against the §Full schema here.
+Single source of truth for the JSON every reviewer returns. **Self-contained** — does not reference any other skill. Each dispatched reviewer reads the §Compact schema from this file directly (the dispatch prompt carries this file's absolute path); the orchestrator validates replies against the §Full schema here.
 
 Every reviewer returns **one JSON object and nothing else** — no prose, no surrounding fences. The object is mandatory even on failure; prose-only output is a failure.
 
-## Compact schema (paste into dispatch prompts)
+## Compact schema (read by each dispatched reviewer)
 
 ```
 Return exactly this JSON shape (no prose, no fences):

@@ -40,7 +40,36 @@ These checks come directly from Anthropic's internal learnings and MUST be appli
 | **Name = directory** | Frontmatter `name` matches the directory name | Mismatch causes invocation confusion |
 | **Composable** | References other skills it depends on or works with | Skills should compose, not duplicate |
 | **No hardcoded paths** | No `/Users/`, `/home/`, `C:\` | Breaks portability |
-| **Reasonable size** | SKILL.md < ~200 lines; total skill folder < 5K tokens in main file | Context budget is finite |
+| **Reasonable size** | SKILL.md alone < ~200 lines / < 5K tokens. Reference subfiles do NOT count against this — that is progressive disclosure working as intended (a 130-line SKILL.md + 600 lines of references is conform) | Context budget is finite; only SKILL.md is always loaded |
+
+### Phase 2.5: Usage audit (when transcripts exist — highest-signal phase)
+
+A skill can score A statically and still generate friction at every use. When session transcripts
+exist (`~/.claude/projects/<project-dir>/*.jsonl`), mine them for how the skill behaves **in
+practice** and weigh that into the grade.
+
+Per audited skill (run in a subagent — transcripts are large, never read whole files):
+
+```bash
+# 1. sessions that actually INVOKED the skill — a plain name grep over-matches
+#    (the available-skills list is embedded in every transcript)
+grep -l -E '"skill": ?"<skill-name>"|<command-name>/<skill-name>' ~/.claude/projects/<dir>/*.jsonl
+# spot-check one hit before counting it as a usage session
+
+# 2. real user messages (the friction story: initial ask, then every correction/re-prompt)
+jq -r 'select(.type=="user" and (.message.content|type)=="string") | .message.content' FILE.jsonl
+jq -r 'select(.type=="user" and (.message.content|type)=="array") | .message.content[] | select(.type=="text") | .text' FILE.jsonl
+```
+
+Friction signals to count:
+- **Corrections after skill output** ("non", "plutôt", "tu as raté", "attention", "refais") — the skill's defaults are wrong.
+- **Repeated instructions across sessions** — anything the user must say every time belongs in the skill (gotcha or default).
+- **Immediate re-invocations** (same skill, ≤2 messages apart) — the first run missed context (args, base, PR#).
+- **Manual follow-up steps** after every run — a missing chaining/handoff.
+
+Report per skill: sessions used · friction incidents (short verbatim quote each) · recurring
+patterns (2+ sessions) → each pattern maps to a concrete fix recommendation in Phase 4. A
+recurring unfixed friction caps the grade at **C** regardless of static score.
 
 ### Phase 3: Report
 
@@ -53,6 +82,7 @@ For each file, output:
 - **Score**: X/32 (or X/20 for commands)
 - **Grade**: A/B/C/D/F
 - **Issues**: (list each failed criterion with 1-line fix suggestion)
+- **Usage**: (Phase 2.5 — sessions used · friction incidents with verbatim quote · recurring patterns; "n/a" when no transcripts)
 - **Best Practices**: (pass/fail for each Anthropic checklist item)
 ```
 
@@ -81,3 +111,15 @@ Prioritize by impact:
 | F | <60% | Major rewrite needed |
 
 Production threshold: **80% (Grade B)**.
+
+**Usage cap (overrides the table):** a recurring unfixed friction from Phase 2.5 caps the final
+grade at **C** — report it as `A→C (usage cap)` so the static score stays visible.
+
+## Gotchas
+
+- **`grep -l '<skill-name>'` over transcripts detects mentions, not usage.** The available-skills
+  listing is embedded in every session file, so a plain name grep matches nearly every transcript
+  (verified: identical hit counts for used and never-used skills). Grep an invocation-specific
+  pattern and spot-check a hit before counting it.
+- **The grade cap is easy to drop on aggregation.** Grade is `min(score grade, usage cap)` — an
+  auditor reading only the Grading table will award A/B to a skill the usage data says is C.

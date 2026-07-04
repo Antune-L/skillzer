@@ -23,7 +23,13 @@ Template for Argus's final output. Verdict + confidence header, per-section find
 | Logic        | X        | Y       | Z   |
 | **Total**    | **X**    | **Y**   | **Z** |
 
-(Only rows for dispatched reviewers. Security never has nits.)
+(Only rows for dispatched reviewers. Security never has nits. Full mode: counts are POST-verification — after verifier drops/demotions.)
+
+Full mode, when the verifier filtered anything (omit when all zeros):
+
+```
+**Verifier:** <D> intentional dropped · <M> demoted to nit[ · <section(s)> unverified]
+```
 
 ---
 

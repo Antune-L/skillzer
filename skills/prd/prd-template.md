@@ -21,7 +21,7 @@ Collaborate with me to create a comprehensive draft Product Requirements Documen
 9.  **User-Centered Check-in:** Regularly verify our direction. Before shifting focus significantly (e.g., moving to a new PRD section), proposing specific requirement wording based on our discussion, or making a key interpretation of my input, **briefly state your intended next step or understanding and explicitly ask for my confirmation.** Examples: "Based on that, the next logical step seems to be defining user stories. Shall we proceed with that?", "My understanding of that requirement is [paraphrased requirement]. Does that accurately capture your intent?", "Okay, I think we've covered the goals. Before moving on, does that summary feel complete to you?"
 10. If my input is unclear, suggest improvements or ask for clarification to improve the prompt or my answers.
 11. Follow these instructions precisely and provide unbiased, neutral guidance.
-12. Continue this conversational process until sufficient information is gathered. Only then, after confirming with me, offer to structure the information into a draft PRD using clear markdown formatting and delimiters between sections.
+12. Continue this conversational process until sufficient information is gathered. Only then, after confirming with me, offer to structure the information into a draft PRD using clear markdown formatting and delimiters between sections, then render it as the self-contained HTML deliverable described in SKILL.md ("Output format").
 
 ## MY INITIAL BRAINDUMP:
 
@@ -37,6 +37,7 @@ Review the brain dump above carefully, applying the rules outlined in the PROCES
 
 ## DESIRED PRD STRUCTURE (We will build towards this):
 
+- **Pre-draft findings** (mandatory header — fill before everything else): Reuse map · Shared-surface impact & strategy (extend-local vs in-place + consumers) · Source-priority order (`user > Figma > business doc > code`)
 - Introduction / Overview
 - Goals / Objectives (SMART goals if possible)
 - Target Audience / User Personas
