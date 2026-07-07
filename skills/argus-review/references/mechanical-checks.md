@@ -227,6 +227,27 @@ Mechanical pre-pass candidates to verify first, then extend:
 
 The conventions reviewer treats these as a starting set: confirm each (drop pre-existing/false-positive), assign severity per the project rule source, and add anything the grep missed (naming, magic numbers, import order, i18n parity).
 
+## File-size count → quality reviewer
+
+Line counts are deterministic — compute them in the parent so the oversized-file check (dimensions.md §quality item 9) never depends on a reviewer noticing:
+
+```bash
+# Total post-diff size of every changed file (skip deleted files); keep those ≥ ~400 lines
+wc -l $FILES 2>/dev/null | sort -rn
+# Diff-added lines per file, to tell "keeps growing" from "barely touched"
+git diff --numstat <base>...<branch> # (or --cached --numstat)
+```
+
+Pass the survivors into the **quality** dispatch under the envelope's "File-size seed" slot:
+
+```
+File-size seed (total lines post-diff, pre-computed by the parent — apply §quality item 9):
+- apps/api/src/services/order.service.ts — 1240 lines total (diff adds 85)
+- apps/web/src/features/basket/basket-recap.tsx — 430 lines total (diff adds 120)
+```
+
+No file ≥400 lines → pass `none` (the reviewer then emits no oversized-file finding). The reviewer owns the judgment call (split axis, cohesion, severity); the parent only owns the counting.
+
 ## Why seed instead of letting the agent re-grep
 
 - **Determinism:** the same diff yields the same seed list every run — no model-to-model variance on the highest-frequency category.
