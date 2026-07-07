@@ -11,5 +11,9 @@ Format: `pattern → default verdict → reason (source PRs)`
 - Bot "add null/undefined check" on a field the schema/ORM marks required → skip-wrong → misread
   of the data model (fftir #317)
 - "Confirm this is intentional" / "verify with design" phrasing with no concrete failure →
-  skip-nit → confirmation-seeking, not a finding (sofrapa #186, fftir #328)
+  skip-nit → confirmation-seeking, not a finding (sofrapa #186, fftir #328, fftir #350)
 - Style-preference renames with no misleading name involved → skip-nit → taste, not correctness
+- Claimed regression citing an invariant from a sibling code path (hook/helper not used at the
+  changed call site) → skip-wrong → verify pre-PR behavior of the exact call site first (fftir #327)
+- Hedged behavioral suggestion ("consider gating…") on a PR with no description → ask → design
+  question with no intent anchor; auto-fix got rolled back as slop (fftir #327)
