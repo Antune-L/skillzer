@@ -14,6 +14,7 @@ These are generated/lock/snapshot noise. Strip the matching files from the patch
 **/*.gen.ts        **/routeTree.gen.ts
 **/paraglide/**    **/generated/**
 **/dist/**         **/.turbo/**   **/node_modules/**
+**/graphify-out/**
 ```
 
 Do **not** strip (review normally, but conventions reviewer skips their import-order/naming):
@@ -26,13 +27,28 @@ Do **not** strip (review normally, but conventions reviewer skips their import-o
 ```bash
 BASE=<base>; BRANCH=<branch>          # or use --cached for staged
 git diff --name-only "$BASE...$BRANCH" \
-  | grep -vE '\.(lock|snap)$|snapshot\.json$|\.gen\.ts$|/paraglide/|/generated/|/dist/|/\.turbo/' \
+  | grep -vE '\.(lock|snap)$|snapshot\.json$|\.gen\.ts$|/paraglide/|/generated/|/dist/|/\.turbo/|/graphify-out/' \
   > "$ARGUS_TMP/files.txt"   # $ARGUS_TMP = the run's mktemp -d dir from SKILL.md step 2
 ```
 
 ## Capability detection (run once, gate the folded checks)
 
 Folded sub-checks must only fire when the project has the capability. Resolve these flags deterministically in the parent and pass them into every dispatch. **Off → the reviewer skips that sub-check.** Detect from the repo root, not just the diff (a project either has i18n or it does not).
+
+**Cache first — capabilities are a property of the repo, not of the PR.** Re-detecting on every run costs minutes for an answer that only changes when the package manifests change. The cache lives in the common git dir (shared across worktrees, never committed), keyed by a hash of the manifests:
+
+```bash
+ROOT=$(git rev-parse --show-toplevel)
+CACHE="$(git rev-parse --git-common-dir)/argus-capabilities"
+KEY=$(cat "$ROOT"/package.json "$ROOT"/apps/*/package.json "$ROOT"/packages/*/package.json 2>/dev/null | shasum | cut -d' ' -f1)
+if [ -f "$CACHE" ] && [ "$(head -1 "$CACHE")" = "$KEY" ]; then tail -n +2 "$CACHE"; fi
+```
+
+On a hit (the flags + LIBS lines print), **skip both detection blocks below entirely**. On a miss, run them, then write the cache:
+
+```bash
+{ echo "$KEY"; echo "i18n=$i18n frontend=$frontend react=$react payments=$payments monorepo=$monorepo"; echo "LIBS=$LIBS"; } > "$CACHE"
+```
 
 ```bash
 ROOT=$(git rev-parse --show-toplevel)
@@ -246,7 +262,52 @@ File-size seed (total lines post-diff, pre-computed by the parent — apply §qu
 - apps/web/src/features/basket/basket-recap.tsx — 430 lines total (diff adds 120)
 ```
 
-No file ≥400 lines → pass `none` (the reviewer then emits no oversized-file finding). The reviewer owns the judgment call (split axis, cohesion, severity); the parent only owns the counting.
+No file ≥400 lines → pass `none` (the reviewer then emits no oversized-file finding). The reviewer owns the judgment call (split axis, cohesion, severity); the parent only owns the counting. Test files (`*.spec.*`, `*.test.*`, `__tests__/`, `e2e/`) still appear in the seed for the ≥400 diff-grown tier, but the reviewer never flags them under the ≥~1000-lines tier (dimensions.md §quality item 9 exemption).
+
+## New-symbol seed → quality reviewer (reuse detection)
+
+Reuse misses are the largest measured recall gap (July 2026 retro: ~30 verified missed-reuse cases vs ~6 detected across 20 PRs — detection only fired on near-verbatim copies; structural duplicates of `useSeedOnDialogOpen`, `claimDue`, `assertSameSet`, `LoadingState`, `useAppForm` all shipped unflagged). The reviewer prose rule ("grep the wider repo") does not fire reliably — make it deterministic like the file-size seed:
+
+```bash
+# 1. Extract newly ADDED top-level symbols from the patch (functions, hooks, components, classes, exported consts/types)
+rg -o '^\+\s*(export\s+)?(default\s+)?(async\s+)?(function|class|interface|type|const)\s+([A-Za-z_$][\w$]*)' \
+   -r '$5' "$ARGUS_TMP/diff.patch" | sort -u > "$ARGUS_TMP/new-symbols.txt"
+
+# 2. For each new symbol, grep the tree OUTSIDE the diff for same/similar names (strip use/get/format/is prefixes for the fuzzy pass)
+while read -r sym; do
+  stem=$(echo "$sym" | sed -E 's/^(use|get|format|is|assert|build|create|resolve)//' )
+  hits=$(rg -l --max-count 3 -e "\b$sym\b" ${stem:+-e "$stem"} "$ROOT/apps" "$ROOT/packages" 2>/dev/null \
+         | grep -vFf "$ARGUS_TMP/files.txt" | head -3)
+  [ -n "$hits" ] && echo "$sym → possible existing equivalent(s): $hits"
+done < "$ARGUS_TMP/new-symbols.txt"
+
+# 3. Canonical homes: for every new file under a feature dir, list the repo's shared dirs so the reviewer checks them
+#    (hooks/, components/ui/, components/shared/, lib/, utils/, packages/*/src) — one `ls` per dir, names only.
+```
+
+Pass survivors into the **quality** dispatch under the envelope's "New-symbol seed" slot:
+
+```
+New-symbol seed (added symbols with a possible pre-existing equivalent — apply §quality item 1/4; verify each, never assume):
+- normalizeSearch → packages/utils/src/normalize-search-text.ts (normalizeSearchText)
+- useMediaQuery → apps/web/src/hooks/shadcn/use-mobile.ts (useIsMobile)
+- none
+```
+
+Name-match is a weak signal both ways: the seed catches same-name/similar-name cases; the reviewer still owns same-shape-different-name detection (grep the canonical shared dirs for every new hook/component/util the diff adds, per §quality item 1). An empty seed does NOT mean no reuse misses.
+
+## Removed-line seed → regression reviewer
+
+Reviewers systematically read added lines and miss removed invariants (July 2026 retro: removed `onFileReject` prop silently changed form semantics; a removed legacy `status: VALID` fallback flipped a whole licensee population; an upsert/stale-delete pair lost its `withTransaction`; a removed 422 guard exposed an unbounded fan-out). Extract the load-bearing `-` lines mechanically:
+
+```bash
+# Removed lines that carry behavior: props/params dropped, guards, transactions, early returns, error handling, exports
+rg -n '^-' "$ARGUS_TMP/diff.patch" | rg -v '^\-\-\-' \
+  | rg -e 'withTransaction|\$transaction|FOR UPDATE|throw |return null|return;|catch|disabled=|\?\.|onError|on[A-Z]\w+=\{|export |fallback|Omit<' \
+  > "$ARGUS_TMP/removed-behavior.txt"
+```
+
+Pass hits (with their file context from the hunk headers) into the **regression** dispatch under the "Removed-behavior seed" slot. For each, the regression reviewer answers: *who depended on this behavior, and is that dependency handled?* — same consumer-grep discipline as renamed symbols. A removed guard/transaction/fallback with a surviving consumer is a finding even when every added line is correct.
 
 ## Why seed instead of letting the agent re-grep
 

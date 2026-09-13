@@ -82,6 +82,9 @@ Rules: summary counts == findings split by severity, exactly. Omit line/end_line
 - Partial review → `status: "partial"` + `coverage: "partial"` + `errors[]` explaining why.
 - Hard failure → `status: "error"` + `coverage: "not-run"` + `errors[]` with cause.
 - Security section never uses `severity: "nit"`.
+- `severity` is exactly one of `critical` / `warning` / `nit`, lowercase. `major`, `minor`, `MINOR`, `[warning]/[nit]` prefixes inside `title`, and any "low confidence" tier are invalid — a low-confidence finding is evidenced or dropped (`confidence: "low"` is metadata for the orchestrator, never a severity).
+- **Every emitted string is English** — `title`, `evidence`, `recommendation`, `category`, `notes[]`, `errors[]` — whatever the repo's or the PR's language. Quote repo/UI strings verbatim inside backticks; no `« »` outside such a quote; domain nouns use the code identifier.
+- Length: `evidence` one sentence, `recommendation` one sentence. A `nit` whose write-up needs 60+ words is not a `nit`.
 - `notes[]` entries are context, never findings: "could not verify" / "`<url>` — not rendered" / other unverified-gap items must not appear in `findings[]` nor inflate `summary` counts — the orchestrator will not post them as comments.
 
 ## Token budget

@@ -24,7 +24,22 @@ then reinvents existing code or breaks shared components.
    **user instruction > Figma mockup > business doc > existing code**. Flag any contradiction you
    spotted between sources for the user to resolve before drafting.
 
-After the PRD content, add a "Tasks" section with a checklist (`- [ ] ...`). Tasks must be MACRO-level (epics), not granular case-by-case items.
+After the PRD content, add a "Tasks" section with a checklist (`- [ ] ...`). Tasks must be
+MACRO-level (epics), not granular case-by-case items. Split tasks by independently verifiable
+outcome or domain boundary, not by arbitrary technical layer.
+
+Identify every task (`T1`, `T2`, etc.) and include:
+
+- **Expected outcome**
+- **Dependencies / start condition** (write `None — can start independently` when applicable)
+- **Observable acceptance criteria**
+- **Relevant boundaries** (interfaces, contracts, or shared surfaces found by the pre-draft scouts)
+
+Reference pre-draft findings instead of duplicating their paths and consumer lists. Keep the PRD
+implementation-agnostic: do not choose a fixed number of agents, assign files to agents, create or
+launch implementation agents, or prescribe their detailed order here. At implementation time, create a separate
+execution plan after checking the current code. That plan owns agent/file assignment, ordering,
+per-task validation, and final integration/regression validation.
 
 ## Output format (mandatory)
 

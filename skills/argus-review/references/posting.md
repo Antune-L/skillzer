@@ -6,6 +6,14 @@ Optional last-mile step. Argus is read-only by default; `--post` (or "poste les 
 
 **Review event maps to the verdict** (§Review event): `REQUEST_CHANGES` when the verdict is `blocking` or `needs-attention` (any critical or warning), `COMMENT` for a nits-only `pass`, and **`APPROVE` when there is genuinely zero feedback** (clean `pass`, no findings of any severity — the user wants the merge green-lit in that case).
 
+## Language — English only, mechanically enforced
+
+Every string argus posts is **English**: the review body, its header, the verdict word, the counts table, severity words, relocation/snap notes, and every inline comment — regardless of the repo's language, the PR's language, the language of `CLAUDE.md` / `AGENTS.md`, or the language a reviewer replied in. A French reviewer reply is translated by the parent before posting, never forwarded.
+
+- Quotes use straight double quotes or backticks. `« »` appear **only** inside a verbatim quote of a French codebase or UI string, itself in backticks (`` `« Périmé »` ``).
+- Domain nouns use the **code identifier**, not its French form: `league` (not "the ligue"), `president` (not "a Président").
+- **Mechanical pre-post check (blocking):** for the review `body` and every `comments[].body`, strip backtick spans and quoted spans, then reject the payload if the remainder contains an accented character (`[àâäçéèêëîïôöùûüœÀ-Ý]`) or ≥3 French stop-words (`le la les des une du et est pas dans pour avec sur ne que qui sont être cette`). Rewrite in English and re-check before posting — never ship the payload that failed (incidents.md §Sept 2026 audit).
+
 ## The one mechanism: a single PR *review* with inline comments
 
 Each finding is an **inline comment anchored at its `file:line`**, all carried in the `comments[]` array of **one** PR review created via:
@@ -49,6 +57,9 @@ The submitted review's `event` mirrors the Argus verdict so the PR's review stat
 - The user opts into both ends — Request changes once findings are uploaded, Approve when there is nothing to flag. Do not silently downgrade a blocking/needs-attention review to `COMMENT`, and do not withhold the approve on a clean pass.
 - A `REQUEST_CHANGES` review can later be dismissed by the human if they disagree; that is expected and fine.
 - An `APPROVE` review carries no inline comments (there are none) — submit it with just the summary body via the reviews API (§Build the review payload), not `gh pr comment`.
+- **The event is computed, never narrated.** It comes from the FINAL posted `comments[]` of this one review request. Sentences describing the event are banned in the body — never "posted as a comment, not an approval or change request", never "Review event is COMMENT only", never any explanation of why the state is what it is. The state *is* the statement.
+- **Never submit a second review to change the state**, and never submit a review with an empty `body` AND empty `comments[]` — an empty placeholder used to flip the PR into `CHANGES_REQUESTED`/`APPROVED` afterwards is timeline pollution and is banned (real incidents: fftir #714/#715 empty `CHANGES_REQUESTED`, #710 empty `APPROVED`). One run = one timeline entry.
+- **`APPROVE` always carries a one-line body** (verdict + coverage), never an empty one. Praise bodies ("Good job !") and meta-narration bodies ("Revue reformulée — …", "findings from the previous summary reposted below") are banned entirely (real incident: fftir #715 — 3 timeline entries for one run).
 - **`APPROVE` sets the review state only — never merge.** Do not run `gh pr merge` (nor `--auto`, nor enable auto-merge). The skill approves; the human merges. If branch protection requires the approval to unblock the merge, that is the human's action afterward, not Argus's.
 
 ## Resolve target
@@ -107,21 +118,39 @@ Map each anchored finding to a comment object: `path`, `line`, `side: "RIGHT"`, 
 {
   "commit_id": "<HEAD_SHA>",
   "event": "REQUEST_CHANGES",
-  "body": "## Argus — <verdict> · <confidence>\n\n<counts table>\n\n**Off-diff / file-level findings**\n- `path` — <evidence>. <fix>",
+  "body": "## Argus — <verdict> · <confidence>\n\n<counts table>\n\n**Coverage:** apps/server 14 files · 6 findings — apps/web 12 files · 0 findings\n\n**Off-diff / file-level findings**\n- `path` — <evidence>. <fix>",
   "comments": [
     { "path": "apps/web/src/features/reviews/reviews-section.tsx", "line": 13, "side": "RIGHT",
       "body": "**[critical] regression** — `[...reviews, ...reviews]` double-counts every review; the `(… avis)` counter is inflated. Use `reviews` directly." },
     { "path": "apps/web/src/features/article/article-details-formatters.ts", "line": 42, "side": "RIGHT",
-      "body": "**[critical] conventions** — `as` cast is hard-banned (CLAUDE.md « No type casting »). Annotate the return type or use a type guard." },
+      "body": "**[critical] conventions** — `as` cast is banned by `AGENTS.md:41` (\"No type casting\"). Annotate the return type or use a type guard." },
     { "path": "apps/web/src/features/article/article-card.tsx", "line": 18, "side": "RIGHT",
       "body": "**[nit] quality** — extract the repeated `border-muted` class to a shared style; cosmetic, non-blocking." }
   ]
 }
 ```
 
-- **Comment body convention:** `**[severity] section** — <evidence>. <recommendation>`. Evidence + fix only; no preamble. **English only** (the report language, regardless of the PR's language). **Never expose the internal fan-out** in a posted comment — no "the logic reviewer rated this critical", no internal confidence levels; the finding stands on its evidence alone.
-- **Body when every finding anchored inline:** verdict line + counts table only — omit the "Off-diff" section entirely. Keep it short. **No prose walkthrough, no per-finding commentary, no meta-narration of the review process** (real drift: fftir #310/#311 bodies carried long walkthroughs and gemini meta-commentary).
+- **Comment body convention:** `**[severity] section** — <evidence>. <recommendation>`. Evidence + fix only; no preamble, English only (§Language). Severity words are **exactly** `critical`, `warning`, `nit` — never `major`/`minor`/`MINOR`, never uppercase variants, and there is **no "low confidence" tier**: a low-confidence finding is either evidenced or dropped. **Never expose the internal fan-out** — no "the logic reviewer rated this critical", no confidence levels, no `<sub>Raised independently by …</sub>` footers; the finding stands on its evidence alone.
+- **Hard word caps:** a `nit` comment ≤ 60 words, a `warning`/`critical` comment ≤ 120 words (one evidence sentence + one fix sentence is the target); the body ≤ ~150 words. A comment that needs 200 words is not a `nit`. If a body would be truncated, **fail the post and rewrite** — never ship a sentence cut mid-word (real drift: fftir #715, 179 words average, 329 max, one comment truncated mid-word).
 - **Unverified gaps are not findings.** Reviewer `notes[]` entries — "screenshot `<url>` not rendered", "could not verify X" — never appear in `comments[]` nor in the counts table (real incidents: sofrapa #183/#184 counted "fidelity unverified" as nits). Render them as one short `Unverified: …` line in the body.
+
+### Review body — exhaustive contents
+
+The posted body is, in this order and **nothing else**:
+
+1. the verdict line (`## Argus — <verdict> · <confidence>`);
+2. the counts table;
+3. at most one `Unverified: …` line;
+4. the **coverage line** — per top-level dir of the diff, file count + finding count, scoped from the file list, never from the PR title. **Mandatory**, including on a one-finding review: a review that touched only a JSDoc block and said nothing about the 3 locale files in the same diff is a coverage bug (real incident: fftir #710);
+5. off-diff / file-level bullets, when any;
+6. on a re-run, the opener `N previous findings resolved · M still open · K withdrawn`;
+7. at most one `Open questions:` line (max 2 questions).
+
+No prose walkthrough, no per-finding commentary, no meta-narration (real drift: fftir #310/#311).
+
+### Deny-list — mechanical check on the body and every comment
+
+Reject and rewrite the payload if any of these appears (case-insensitive): `reviewer`, `reviewers`, `verifier`, `adversarial`, `confidence:`, `dropped`, `demoted`, `raised independently`, `flagged independently`, `verified clean`, `holds up`, `checks out`, `what was verified`, `in this session`, or an internal finding id (`logic-2`, `ARCH-2`, `<section>.<category>.<slug>`). These leak the internal fan-out and the internal report into a public review (real incidents: fftir #462 "What was verified as safe", #707 a `| Claim | Why it died |` table of dropped warnings, #700/#702/#698/#442 "6/6 reviewers ok" / "Demoted to a nit by verification" / "bun typecheck passes… 105 pass / 0 fail"). Test-run and typecheck claims are also banned — argus does not run the suite.
 
 ## Dedupe against ALL existing threads — humans and bots, not just argus re-runs
 
@@ -139,7 +168,8 @@ Then for each finding:
 
 Reposting a point a human already made — especially the PR's own reviewer — reads as "the bot didn't read the thread" and tanks trust in the whole batch (real incident: sofrapa #112, argus duplicated the user's own earlier comment → "pk tu répètes, ta pas lu ou quoi ?"). Building on an existing thread with credit (sofrapa #103, gemini overlap acknowledged in the finding) is the correct pattern.
 
-3. **Commenting on another reviewer's claim is itself an assertion.** Endorsing, ranking ("higher-priority"), or refuting a human's or bot's finding in the review body requires the same evidence bar as an own finding — open the schema, check the docs first. Real incident: fftir #317, the body promoted gemini's `licensee.user` null-safety claim to "higher-priority" while the Prisma relation is `required`; the author had to refute argus's endorsement. Refuting with a doc citation is high-value (fftir #311, TanStack default columns); an unverified endorsement is a co-signed FP — when unverified, say nothing about it.
+3. **A finding a human already refuted is never re-posted.** On a re-run, read the human replies on your own prior threads: a rejected finding stays rejected unless you have new evidence that answers the rejection, and it is then a reply *in that thread*, not a new one (real incidents: fftir #712 round 2 ignored 3 rejections from round 1 posted 48 min earlier; the TODO/FIXME rule refuted on #711 at 14:16 was re-posted on #719 at 14:34).
+4. **Commenting on another reviewer's claim is itself an assertion.** Endorsing, ranking ("higher-priority"), or refuting a human's or bot's finding in the review body requires the same evidence bar as an own finding — open the schema, check the docs first. Real incident: fftir #317, the body promoted gemini's `licensee.user` null-safety claim to "higher-priority" while the Prisma relation is `required`; the author had to refute argus's endorsement. Refuting with a doc citation is high-value (fftir #311, TanStack default columns); an unverified endorsement is a co-signed FP — when unverified, say nothing about it.
 
 ## Post
 

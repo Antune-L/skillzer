@@ -10,6 +10,7 @@ Template for Argus's final output. Verdict + confidence header, per-section find
 **Verdict:** <blocking | needs-attention | pass> · **Confidence:** <high | medium | low>
 **Scope:** <N> files (+<X> / -<Y>) · <K> generated/lock/snapshot files ignored
 **Reviewers:** quality · conventions · regression · logic[ · architecture · security]
+**Coverage:** <one line per top-level dir in the diff with its file count and finding count — e.g. `apps/server 14 files · 6 findings — apps/mobile 12 files · 0 findings`. Scope comes from the FILE LIST, never from the PR title/description; a dir with many files and zero findings is a visible fact the user can challenge, not a silent implication of "clean" (real misses clustered exactly in the zero-finding dirs of #279/#280).>
 
 ## Summary
 
@@ -77,13 +78,18 @@ Prioritized, global, actionable. The user picks what to fix.
 4. **[warning]** `basket-recap.tsx:26` — replace hardcoded `'fr-FR'` with the active locale.
 ```
 
+**The rendered report is local, and it is NOT the posted review body.** The body posted to the PR is the short subset defined in posting.md §Review body — exhaustive contents (verdict line + counts table + optional `Unverified:` line + mandatory coverage line + off-diff bullets, ≤ ~150 words). Never widen it with report material.
+
 ## What NOT to include
 
 - Raw diff blocks — the user already has `git diff`.
 - File contents quoted at length — reference `file:line`.
 - Praise or filler ("Great PR overall!"). Findings only.
 - Speculation about intent — stick to what the diff shows.
+- **Internal-report material in anything posted** — "What was verified as safe" lists, tables of dropped/demoted findings (`| Claim | Why it died |`), fan-out leaks ("6/6 reviewers ok", "raised independently by two reviewers", "the verifier disagreed"), and test/typecheck claims ("105 pass / 0 fail" — argus does not run the suite). posting.md §Deny-list rejects these mechanically (real incidents: fftir #462/#707/#700/#702/#698, sofrapa #442).
+- **Any French in an emitted string** — the report is English too (posting.md §Language); repo/UI strings are quoted verbatim in backticks.
 - Recommendations to add new dependencies — flag if a reviewer slipped one in.
+- **"Verified as delivered" / "checks out" / "verified clean" lists.** A positive assertion carries the same evidence bar as a finding — either cite the specific `file:line` checks that back it, or say nothing about that area (the coverage line already shows what was reviewed). The July 2026 retro's three worst misses all sat inside areas the summary had explicitly certified clean ("locale typing … check out" while the diff made `locale` optional for every mail; "per-vehicle TecDoc image resolution verified clean" while it was a 1→N×2 request amplification). An unverified doubt belongs in one `Unverified:` line, phrased as the concrete in-diff question — never converted into a clean bill of health.
 
 ## Footer
 

@@ -47,6 +47,14 @@ Review the brain dump above carefully, applying the rules outlined in the PROCES
 - Design Considerations / Mockups (Mention if available/needed)
 - Success Metrics
 - Open Questions / Future Considerations
+- Tasks
+  - Keep a macro checklist of independently verifiable outcomes, identified `T1`, `T2`, etc.
+  - For each task, state: **Expected outcome** · **Dependencies / start condition**
+    (`None — can start independently` if applicable) · **Observable acceptance criteria** ·
+    **Relevant boundaries** (interfaces, contracts, or shared surfaces from Pre-draft findings).
+  - Example: `- [ ] T1 — Establish the reporting contract` followed by those four fields.
+  - Do not assign agents, files, execution order, or a fixed agent count. Create that detailed plan
+    at implementation time after checking the current code.
 
 ## TONE & CONSTRAINTS:
 
