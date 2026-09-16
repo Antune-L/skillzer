@@ -1,0 +1,61 @@
+{
+  "$schema": "./schemas/prd.schema.json",
+  "schemaVersion": 1,
+  "id": "saved-searches",
+  "revision": "1",
+  "title": "Saved catalogue searches",
+  "summary": "Let returning buyers save a useful catalogue query and restore it without rebuilding every filter.",
+  "locale": "en",
+  "preDraft": {
+    "reuse": ["reuse CatalogueFilters (apps/web/src/catalogue/CatalogueFilters.tsx)"],
+    "sharedSurfaces": ["extend locally CatalogueFilters with an optional saved-search trigger; consumers: CataloguePage, MobileCatalogueDrawer"],
+    "sourcePriority": ["user instruction", "Figma mockup", "business document", "existing code"]
+  },
+  "goals": ["At least 80% of saved searches restore the same filter state during the first 30 days."],
+  "users": ["Returning buyers who repeatedly search the same product families."],
+  "userStories": ["As a returning buyer, I can name and save my current search so that I can restore it later."],
+  "requirements": [
+    {
+      "id": "FR1",
+      "kind": "functional",
+      "title": "Save the current search",
+      "description": "An authenticated buyer can save the current query and filters under a unique name.",
+      "priority": "must",
+      "status": "proposed",
+      "acceptance": ["The saved entry contains the query and every active filter.", "A duplicate name asks the buyer to choose another name."]
+    },
+    {
+      "id": "NFR1",
+      "kind": "non-functional",
+      "title": "Keyboard access",
+      "description": "Every save and restore action remains operable with a keyboard.",
+      "priority": "must",
+      "status": "proposed",
+      "acceptance": ["Focus order follows the visible controls and the dialog returns focus to its trigger."]
+    }
+  ],
+  "designConsiderations": ["Use the existing catalogue dialog and form controls."],
+  "successMetrics": ["At least 25% of weekly returning buyers create one saved search within 60 days."],
+  "outOfScope": ["Sharing saved searches with another account."],
+  "openQuestions": ["Should accounts have a maximum number of saved searches?"],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Persist saved searches",
+      "expectedOutcome": "An authenticated buyer can create, rename and delete a private saved search.",
+      "startCondition": "None — can start independently",
+      "dependsOn": [],
+      "acceptance": ["Persistence can be observed after signing out and back in."],
+      "boundaries": ["Saved-search storage contract and authenticated account boundary from preDraft."]
+    },
+    {
+      "id": "T2",
+      "title": "Restore a saved search",
+      "expectedOutcome": "Selecting a saved search restores its query and filters in the catalogue.",
+      "startCondition": "T1 has established the saved-search contract.",
+      "dependsOn": ["T1"],
+      "acceptance": ["The URL and visible controls represent the restored state.", "The interaction is keyboard accessible."],
+      "boundaries": ["Local CatalogueFilters extension and its listed consumers from preDraft."]
+    }
+  ]
+}

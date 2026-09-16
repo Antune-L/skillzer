@@ -1,61 +1,67 @@
 ---
 name: prd
-description: "Generate a Product Requirements Document from user instructions using the PRD template. Outputs a human-readable self-contained HTML file plus a markdown source for implementation tooling. Includes a macro-level task checklist at the end."
+description: "Create a Product Requirements Document as structured JSON and render a self-contained HTML deliverable. The JSON is the sole PRD source and ends with macro-level implementation tasks."
 ---
 
-Use the template at [prd-template.md](./prd-template.md). Follow its directives and replace placeholders with the user's instructions.
+# Product requirements documents
 
-## Pre-draft (mandatory — before writing the PRD)
+Author the PRD once as JSON and present the generated HTML to the user. Never create a parallel
+`.prd.md` or hand-write the HTML.
 
-Run these gates first and record their output in the PRD's **Pre-draft findings** block. Skipping
-them under-specifies the work; the implementer (often a weaker model that follows the PRD literally)
-then reinvents existing code or breaks shared components.
+Use [prd-template.json](prd-template.json) as a concrete, valid starting document. The field
+contract is documented by [schemas/prd.schema.json](schemas/prd.schema.json), while the renderer
+performs dedicated validation of the same contract without claiming general JSON Schema support.
 
-1. **Reuse scout** — run the `ts-search-first` skill to find existing components, hooks, utils,
-   contracts, and feature codes to reuse. List each as "reuse `X` (`path`)". Don't let the
-   implementer recreate what exists. If the project defines its own reuse rule (CLAUDE.md,
-   `.cursor/rules/*`), cite it in the findings.
-2. **Shared-surface scout** — decide whether the feature must touch a shared file (any file
-   imported by many features: `components/ui|form|table|layout`, `hooks/`, `lib/`, `utils/`,
-   shared packages in a monorepo — detect per project, don't assume this layout). If yes, state
-   per file: **extend locally** (preferred — new prop/variant/wrapper) OR, if an in-place edit is
-   unavoidable, **list the consumers + require backward-compat and a `regression-check` pass**.
-3. **Source priority** — declare the order the implementer follows when sources disagree:
-   **user instruction > Figma mockup > business doc > existing code**. Flag any contradiction you
-   spotted between sources for the user to resolve before drafting.
+## Before drafting
 
-After the PRD content, add a "Tasks" section with a checklist (`- [ ] ...`). Tasks must be
-MACRO-level (epics), not granular case-by-case items. Split tasks by independently verifiable
-outcome or domain boundary, not by arbitrary technical layer.
+Inspect the repository before asking for facts. Use `ts-search-first` to find components, hooks,
+utilities, contracts and feature codes that can be reused. Record concrete hits in `preDraft.reuse`.
 
-Identify every task (`T1`, `T2`, etc.) and include:
+Identify shared surfaces and their consumers. Prefer a local extension such as a prop, variant or
+wrapper. When an in-place change is unavoidable, list its consumers, require backward compatibility
+and include a `regression-check` pass in `preDraft.sharedSurfaces`.
 
-- **Expected outcome**
-- **Dependencies / start condition** (write `None — can start independently` when applicable)
-- **Observable acceptance criteria**
-- **Relevant boundaries** (interfaces, contracts, or shared surfaces found by the pre-draft scouts)
+Resolve source disagreements with the user before drafting. Record the source order exactly as
+`user instruction`, `Figma mockup`, `business document`, `existing code`, unless the user explicitly
+changes it. Put unresolved contradictions in `openQuestions`.
 
-Reference pre-draft findings instead of duplicating their paths and consumer lists. Keep the PRD
-implementation-agnostic: do not choose a fixed number of agents, assign files to agents, create or
-launch implementation agents, or prescribe their detailed order here. At implementation time, create a separate
-execution plan after checking the current code. That plan owns agent/file assignment, ordering,
-per-task validation, and final integration/regression validation.
+Ask one to three questions only when a material product decision remains unresolved. Preserve the
+guided, user-centred check-in before a significant change of focus or key interpretation. Draft only
+after the user confirms there is enough information.
 
-## Output format (mandatory)
+## Authoring contract
 
-The human-facing deliverable is an **HTML file**, not raw markdown.
+Create `plans/<timestamp>-<slug>.prd.json`. Use plain text in values; do not encode HTML, Markdown
+layout or generated counters. Keep requirements observable and implementation-agnostic.
 
-1. Write the PRD as markdown (`<name>.prd.md`) — the single source of truth, consumed by
-   implementation skills (`composer-implement`, `oppenheimer`, plan runners). Use GFM: tables for requirements with
-   attributes (priority, status), `- [ ]` task checklist, a `## Pre-draft findings` section at
-   the top.
-2. Render the HTML **from the markdown via the script** — never write the HTML by hand:
+The final `tasks` array is a macro checklist of independently verifiable outcomes. Each task uses a
+stable `T1`, `T2`, etc. identifier and states `expectedOutcome`, `startCondition`, observable
+`acceptance` criteria and `boundaries` from `preDraft`. Use
+`None — can start independently` when a task has no prerequisite.
 
-   ```bash
-   ~/.claude/skills/prd/scripts/render-prd-html.sh <name>.prd.md
-   ```
+Do not assign agents, files, execution order or a fixed agent count. Those choices belong to a
+separate implementation plan based on the current code.
 
-   It produces a self-contained `<name>.prd.html` (inline CSS, light/dark, table of contents,
-   real checkboxes) next to the source. After any edit to the `.prd.md`, re-run the script —
-   the HTML is a build artifact, not a second document to maintain.
-3. Tell the user the HTML path and suggest `open <name>.prd.html` to view it.
+## Render and validate
+
+Resolve this skill directory as `<prd-skill>`, then run:
+
+```bash
+<prd-skill>/scripts/render-prd-html.sh plans/<timestamp>-<slug>.prd.json
+```
+
+The command validates the complete supported contract before writing
+`plans/<timestamp>-<slug>.prd.html`. It has no package installation step or network dependency. An
+optional second argument sets another HTML output path. Re-run it after every JSON edit and fix every
+reported validation error.
+
+Present the HTML path, the JSON source path and unresolved questions. Generated HTML is a build
+artifact; agents and implementation tools consume the JSON.
+
+## Gotchas
+
+- JSON has no comments and rejects trailing commas. Keep rationale in document fields.
+- Empty optional arrays are valid, but every supported top-level field is required to prevent silent
+  content loss between authoring and rendering.
+- Task dependencies must reference another task ID and cannot reference the same task.
+- Text is escaped during rendering. Put literal product wording in JSON; never pre-escape HTML.

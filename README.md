@@ -68,6 +68,7 @@ See [`CLAUDE.md`](./CLAUDE.md) for more on writing effective skills and project 
 
 ## References
 
+- **prd** was enhanced by [Westerbay](https://github.com/Westerbay). Thank you for the contribution!
 - **audit-agents-skills** is built on top of [claude-code-ultimate-guide](https://github.com/FlorianBruniaux/claude-code-ultimate-guide) combined with best practices shared by [an Anthropic engineer](https://x.com/trq212/status/2033949937936085378).
 - **architecture-reviewer** and **smart-explore** are adapted from [claude-code-ultimate-guide](https://github.com/FlorianBruniaux/claude-code-ultimate-guide) templates (`examples/agents/` and `examples/skills/`).
 
