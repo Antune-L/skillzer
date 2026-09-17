@@ -202,116 +202,1154 @@ def validate_dependency_cycles(dependencies, known, errors):
         visit(task_id)
 
 
+DEFAULT_SOURCE_PRIORITY = ["user instruction", "Figma mockup", "business document", "existing code"]
+WORDS_PER_MINUTE = 200
+MINIMUM_READING_MINUTES = 1
+SINGULAR_COUNT = 1
+SUMMARY_WORD_BUDGET = 60
+LIST_ITEM_WORD_BUDGET = 25
+REQUIREMENT_DESCRIPTION_WORD_BUDGET = 40
+ACCEPTANCE_WORD_BUDGET = 30
+EXPECTED_OUTCOME_WORD_BUDGET = 30
+MAX_MUST_REQUIREMENTS = 7
+MAX_ACCEPTANCE_ITEMS = 5
+MUST_PRIORITY = "must"
+BUDGETED_LIST_FIELDS = ("goals", "successMetrics", "outOfScope")
+SECONDARY_FIELDS = ("users", "userStories", "designConsiderations", "successMetrics")
+WARNING_PREFIX = "warning: "
+DENSITY_STORAGE_KEY = "prd-density"
+AGENT_STORAGE_KEY = "prd-agent-context"
+THEME_STORAGE_KEY = "prd-theme"
+THEME_ATTRIBUTE = "data-theme"
+DARK_THEME_VALUE = "dark"
+LIGHT_THEME_VALUE = "light"
+COUNT_SEPARATOR = " · "
+COUNT_PLACEHOLDER = "{count}"
+COUNT_DECISION_CLASS = "count-decision"
+DEPENDENCY_SEPARATOR = ", "
+SLIDE_KIND_ATTRIBUTE = "data-slide-kind"
+SLIDE_TITLE_ATTRIBUTE = "data-slide-title"
+SLIDE_REF_ATTRIBUTE = "data-slide-ref"
+PRESENTING_KIND_ATTRIBUTE = "data-presenting-kind"
+SLIDE_DENSE_CLASS = "slide-dense"
+DENSE_SLIDE_ITEM_THRESHOLD = 4
+KIND_CONTEXT = "context"
+KIND_DECISION = "decision"
+KIND_REQUIREMENT = "requirement"
+KIND_TASK = "task"
+KIND_LABEL_KEYS = {
+    KIND_CONTEXT: "kindContext",
+    KIND_DECISION: "kindDecision",
+    KIND_REQUIREMENT: "kindRequirement",
+    KIND_TASK: "kindTask",
+}
+PRESENTATION_RAIL_ID = "presentation-rail"
+PRESENTATION_GRID_ID = "presentation-grid"
+PRESENTATION_OVERVIEW_ID = "presentation-overview"
+BRIEF_ID = "brief"
+DECISIONS_ID = "decisions"
+GOALS_ID = "goals"
+OUT_OF_SCOPE_ID = "out-of-scope"
+REQUIREMENTS_ID = "requirements"
+TASKS_ID = "tasks"
+SECONDARY_ID = "secondary"
+IMPACT_ID = "impact"
+AGENT_CONTEXT_ID = "agent-context"
+AGENT_NOTE_ID = "agent-note"
+LIST_BLOCKS = (
+    (DECISIONS_ID, "decisions", "openQuestions", "block slide decisions", "ol", KIND_DECISION),
+    (GOALS_ID, "goals", "goals", "block slide", "ul", KIND_CONTEXT),
+    (OUT_OF_SCOPE_ID, "outOfScope", "outOfScope", "block slide", "ul", KIND_CONTEXT),
+)
+TOOLBAR_BUTTONS = (
+    ("density", "compact"),
+    ("agent-toggle", "showAgent"),
+    ("expand-all", "expandAll"),
+    ("presentation", "presentation"),
+    ("theme", "darkTheme"),
+)
+
+LABELS = {
+    "fr": {
+        "brief": "Résumé",
+        "revision": "Révision",
+        "contents": "Sommaire",
+        "decisions": "Décisions attendues",
+        "goals": "Objectifs",
+        "outOfScope": "Hors périmètre",
+        "requirements": "Exigences",
+        "tasks": "Tâches",
+        "secondary": "Contexte complémentaire",
+        "users": "Utilisateurs cibles",
+        "userStories": "Récits utilisateurs",
+        "designConsiderations": "Considérations de design",
+        "successMetrics": "Indicateurs de succès",
+        "impact": "Impact et compatibilité",
+        "agentContext": "Contexte agent",
+        "reuse": "Carte de réutilisation",
+        "sourcePriority": "Ordre de priorité des sources",
+        "boundaries": "Périmètre",
+        "mustGroup": "Indispensable",
+        "otherGroup": "Ensuite",
+        "acceptance": "Critères observables",
+        "startCondition": "Condition de démarrage",
+        "afterChip": "après {dependencies}",
+        "countRequirements": {"one": "{count} exigence", "many": "{count} exigences"},
+        "countTasks": {"one": "{count} tâche", "many": "{count} tâches"},
+        "countQuestions": {"one": "{count} question ouverte", "many": "{count} questions ouvertes"},
+        "countReadingTime": {"one": "~{count} min de lecture", "many": "~{count} min de lecture"},
+        "agentHiddenNote": "{count} entrées réservées à l'agent sont masquées — elles restent dans le JSON",
+        "showAgent": "Afficher le contexte agent",
+        "hideAgent": "Masquer le contexte agent",
+        "expandAll": "Tout déplier",
+        "collapseAll": "Tout replier",
+        "presentation": "Mode présentation",
+        "exitPresentation": "Quitter la présentation",
+        "overview": "Vue d'ensemble (g)",
+        "kindContext": "Contexte",
+        "kindDecision": "Décision attendue",
+        "kindRequirement": "Exigence",
+        "kindTask": "Tâche",
+        "previous": "Précédent",
+        "next": "Suivant",
+        "compact": "Mode compact",
+        "comfort": "Mode confort",
+        "darkTheme": "Thème sombre",
+        "lightTheme": "Thème clair",
+        "empty": "Aucun élément.",
+    },
+    "en": {
+        "brief": "Brief",
+        "revision": "Revision",
+        "contents": "Contents",
+        "decisions": "Decisions needed",
+        "goals": "Goals",
+        "outOfScope": "Out of scope",
+        "requirements": "Requirements",
+        "tasks": "Tasks",
+        "secondary": "Additional context",
+        "users": "Target users",
+        "userStories": "User stories",
+        "designConsiderations": "Design considerations",
+        "successMetrics": "Success metrics",
+        "impact": "Impact and compatibility",
+        "agentContext": "Agent context",
+        "reuse": "Reuse map",
+        "sourcePriority": "Source priority order",
+        "boundaries": "Boundaries",
+        "mustGroup": "Must have",
+        "otherGroup": "Next",
+        "acceptance": "Observable acceptance",
+        "startCondition": "Start condition",
+        "afterChip": "after {dependencies}",
+        "countRequirements": {"one": "{count} requirement", "many": "{count} requirements"},
+        "countTasks": {"one": "{count} task", "many": "{count} tasks"},
+        "countQuestions": {"one": "{count} open question", "many": "{count} open questions"},
+        "countReadingTime": {"one": "~{count} min read", "many": "~{count} min read"},
+        "agentHiddenNote": "{count} entries reserved for the agent are hidden — they stay in the JSON",
+        "showAgent": "Show agent context",
+        "hideAgent": "Hide agent context",
+        "expandAll": "Expand all",
+        "collapseAll": "Collapse all",
+        "presentation": "Presentation mode",
+        "exitPresentation": "Exit presentation",
+        "overview": "Overview (g)",
+        "kindContext": "Context",
+        "kindDecision": "Decision needed",
+        "kindRequirement": "Requirement",
+        "kindTask": "Task",
+        "previous": "Previous",
+        "next": "Next",
+        "compact": "Compact mode",
+        "comfort": "Comfort mode",
+        "darkTheme": "Dark theme",
+        "lightTheme": "Light theme",
+        "empty": "None recorded.",
+    },
+}
+
+LIGHT_TOKENS_PLACEHOLDER = "__LIGHT_TOKENS__"
+DARK_TOKENS_PLACEHOLDER = "__DARK_TOKENS__"
+
+LIGHT_TOKENS = """color-scheme:light;
+  --bg:#f6f7f9;--surface:#ffffff;--fg:#191b20;--muted:#5b616d;--border:#e1e4ea;
+  --accent:#3a4fb8;--accent-soft:#eef1fb;--decision-bg:#fdf6e6;--decision-border:#e0c98d;
+  --decision-fg:#7a5a0c;--task:#1f7a6b;--ghost:#e6eaf2;
+  --chip-bg:#eef1fb;--code-bg:#f0f2f6;--print-border:#cccccc;--measure:70ch;"""
+
+DARK_TOKENS = """color-scheme:dark;
+  --bg:#121317;--surface:#1a1c22;--fg:#e7e8ec;--muted:#a2a7b3;--border:#2b2e37;
+  --accent:#9aa9f5;--accent-soft:#222639;--decision-bg:#2a2416;--decision-border:#5a4c27;
+  --decision-fg:#e6c777;--task:#6fd0bd;--ghost:#232732;
+  --chip-bg:#222639;--code-bg:#22252d;--print-border:#cccccc;--measure:70ch;"""
+
+STYLE_TEMPLATE = """
+:root{
+  __LIGHT_TOKENS__
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    __DARK_TOKENS__
+  }
+}
+:root[data-theme="dark"]{
+  __DARK_TOKENS__
+}
+:root{
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --pres-topbar:2.9rem;--pres-bar:4.4rem;--pres-rail:1.9rem;
+  --stage-max:1200px;--stage-pad:clamp(1rem,4vw,3.5rem);--slide-gap:clamp(.6rem,1.5vh,1.4rem);
+  --slide-title:clamp(2rem,4.5vw + 1vh,4.5rem);
+  --slide-lede:clamp(1.15rem,1.4vw + .7vh,2rem);
+  --slide-body:clamp(1.15rem,1.2vw + .6vh,1.75rem);
+  --slide-eyebrow:clamp(.72rem,.4vw + .3vh,1.05rem);
+  --slide-number:clamp(2.3rem,3.4vw + 1.4vh,4.6rem);
+  --slide-ghost:clamp(5rem,14vw,12rem);
+  --title-measure:34ch;--body-measure:60ch;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);overflow-wrap:anywhere;
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.topbar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between;
+  padding:.6rem 1.25rem;background:var(--surface);border-bottom:1px solid var(--border)}
+.topbar-title{font-size:.82rem;font-weight:600;letter-spacing:.02em;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:24rem}
+.toolbar{display:flex;flex-wrap:wrap;gap:.4rem}
+button{font:inherit;font-size:.82rem;border:1px solid var(--border);background:var(--surface);color:var(--fg);
+  border-radius:99px;padding:.34rem .8rem;cursor:pointer}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.layout{display:grid;grid-template-columns:14rem minmax(0,1fr);gap:2.5rem;max-width:74rem;margin:0 auto;padding:1.75rem 1.25rem 4rem}
+aside{position:sticky;top:4.2rem;align-self:start;max-height:calc(100vh - 5.5rem);overflow:auto}
+main{min-width:0}
+nav{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:.85rem .95rem}
+nav strong{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+nav ul{list-style:none;margin:.5rem 0 0;padding:0}
+nav a{display:block;padding:.16rem 0;font-size:.86rem;color:var(--fg);text-decoration:none}
+nav a:hover{color:var(--accent)}
+h1{font-size:1.9rem;line-height:1.2;margin:.4rem 0 .6rem;max-width:var(--measure)}
+h2{font-size:1.18rem;line-height:1.3;margin:0 0 .9rem;scroll-margin-top:4.5rem}
+h3{font-size:.95rem;margin:1.2rem 0 .4rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+p,li{max-width:var(--measure)}
+a{color:var(--accent)}
+code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;padding:.05em .32em;font-size:.86em}
+.meta{color:var(--muted);font-size:.85rem;margin:0}
+.summary{font-size:1.08rem;margin:0 0 1rem}
+.counts{color:var(--muted);font-size:.86rem;margin:0}
+.block{margin:0 0 2.2rem;padding:0}
+.block>h2{padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+.decisions{background:var(--decision-bg);border:1px solid var(--decision-border);border-radius:12px;padding:1.1rem 1.2rem}
+.decisions>h2{border-bottom:0;padding-bottom:0}
+.decisions ol{margin:0;padding-left:1.2rem}
+.decisions li{margin:.35rem 0}
+.item{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:0 0 .5rem;padding:.55rem .85rem}
+.item>summary{display:block;list-style:none;cursor:pointer}
+.item>summary::-webkit-details-marker{display:none}
+.item>summary::before{content:"▸";display:inline-block;width:1rem;color:var(--muted)}
+.item[open]>summary::before{content:"▾"}
+.item-title{font-weight:600}
+.item-body{padding:.35rem 0 .2rem 1rem;border-top:1px solid var(--border);margin-top:.55rem}
+.item-body ul{margin:.3rem 0;padding-left:1.1rem}
+.outcome{display:block;margin:.25rem 0 0 1rem;color:var(--muted);font-size:.92rem;max-width:var(--measure)}
+.badge{display:inline-block;margin-left:.4rem;padding:.02rem .45rem;border-radius:99px;font-size:.72rem;
+  border:1px solid var(--border);background:var(--chip-bg);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.badge-must{border-color:var(--accent);color:var(--accent)}
+.chip{display:inline-block;margin-left:.4rem;padding:.02rem .45rem;border-radius:99px;font-size:.72rem;
+  background:var(--chip-bg);color:var(--muted)}
+.group>summary{cursor:pointer;font-weight:600}
+.group>summary h2{display:inline;border-bottom:0;font-size:1.18rem}
+.sub{border-top:1px solid var(--border);padding:.5rem 0}
+.sub>summary{cursor:pointer;color:var(--muted)}
+.agent-block{border:1px dashed var(--border);border-radius:10px;padding:1rem 1.2rem;background:var(--surface)}
+.agent-note{color:var(--muted);font-size:.85rem;font-style:italic;margin:2rem 0 0}
+.empty,.muted{color:var(--muted)}
+.presentation-bar{position:fixed;left:50%;bottom:1rem;transform:translateX(-50%);display:flex;gap:.5rem;align-items:center;
+  background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:.4rem .7rem;z-index:10}
+.presentation-counter{font-size:.82rem;color:var(--muted);min-width:4rem;text-align:center;font-variant-numeric:tabular-nums}
+.presentation-rail{position:fixed;left:0;right:0;top:var(--pres-topbar);z-index:6;
+  display:flex;gap:2px;align-items:flex-end;height:var(--pres-rail);padding:.55rem clamp(.5rem,2vw,1.2rem) 0}
+.rail-segment{flex:1 1 0;min-width:0;height:6px;padding:0;border:0;border-radius:2px;background:var(--border);cursor:pointer}
+.rail-segment:hover{border-color:transparent}
+.rail-segment[data-slide-kind="decision"]{background:var(--decision-border)}
+.rail-segment[data-slide-kind="requirement"]{background:var(--accent)}
+.rail-segment[data-slide-kind="task"]{background:var(--task)}
+.rail-segment.is-past{opacity:.3}
+.rail-segment.is-current{height:13px;background:var(--fg);opacity:1}
+.presentation-grid{position:fixed;left:0;right:0;top:calc(var(--pres-topbar) + var(--pres-rail));bottom:var(--pres-bar);
+  z-index:7;overflow:auto;background:var(--bg);padding:clamp(.8rem,2vw,1.5rem);
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:.6rem;align-content:start}
+.grid-tile{display:flex;flex-direction:column;gap:.2rem;text-align:left;border-radius:6px;
+  border:1px solid var(--border);border-top:3px solid var(--border);background:var(--surface);
+  padding:.5rem .6rem;font-size:.78rem;line-height:1.3;cursor:pointer}
+.grid-tile:hover{color:var(--fg)}
+.grid-tile[data-slide-kind="decision"]{border-top-color:var(--decision-border)}
+.grid-tile[data-slide-kind="requirement"]{border-top-color:var(--accent)}
+.grid-tile[data-slide-kind="task"]{border-top-color:var(--task)}
+.grid-tile.is-current{outline:2px solid var(--fg);outline-offset:1px}
+.grid-tile-ref{font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+body.presenting{overflow:hidden}
+body.presenting .topbar{height:var(--pres-topbar);flex-wrap:nowrap;gap:.4rem;padding:.25rem .8rem;overflow:hidden}
+body.presenting .topbar-title{font-size:.72rem;max-width:45vw}
+body.presenting #density,body.presenting #agent-toggle,body.presenting #expand-all{display:none}
+body.presenting aside,body.presenting .agent-note{display:none}
+body.presenting .layout{display:block;max-width:none;margin:0;padding:0}
+body.presenting main{height:calc(100vh - var(--pres-topbar) - var(--pres-bar));
+  height:calc(100dvh - var(--pres-topbar) - var(--pres-bar));overflow:auto;
+  display:grid;align-content:safe center;justify-items:center;
+  padding:calc(var(--pres-rail) + var(--stage-pad)) var(--stage-pad) var(--stage-pad)}
+body.presenting .slide{width:min(100%,var(--stage-max));margin:0}
+body.presenting .block{margin:0;padding:0;width:min(100%,var(--stage-max))}
+body.presenting .pres-group{display:flex;flex-direction:column;gap:var(--slide-gap)}
+body.presenting .pres-group>h2{font-size:var(--slide-eyebrow);font-weight:600;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--muted);border-bottom:0;padding:0;margin:0}
+body.presenting .pres-group>h3{display:none}
+body.presenting header.slide,body.presenting section.slide{display:flex;flex-direction:column;gap:var(--slide-gap)}
+body.presenting .slide h1,body.presenting .slide>h2,body.presenting .group>summary h2,body.presenting .item-title{
+  font-size:var(--slide-title);line-height:1.08;letter-spacing:-.025em;font-weight:700;
+  max-width:var(--title-measure);margin:0;border:0;padding:0;text-wrap:balance}
+body.presenting .slide p,body.presenting .slide li{font-size:var(--slide-body);line-height:1.45;max-width:var(--body-measure)}
+body.presenting .slide ul,body.presenting .slide ol{display:flex;flex-direction:column;gap:.45em;margin:0;padding-left:1.1em}
+body.presenting .slide .summary{font-size:var(--slide-lede);color:var(--muted);margin:0}
+body.presenting .meta{font-size:var(--slide-eyebrow);text-transform:uppercase;letter-spacing:.12em;margin:0}
+body.presenting .meta code{background:none;border:0;padding:0;font-family:var(--mono)}
+body.presenting .counts{display:flex;flex-wrap:wrap;gap:.6rem clamp(1.4rem,4vw,3.5rem);max-width:none;margin:0}
+body.presenting .count{display:flex;flex-direction:column}
+body.presenting .count-sep{display:none}
+body.presenting .count-value{font-size:var(--slide-number);font-weight:700;line-height:1;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--fg)}
+body.presenting .count-label{font-size:var(--slide-eyebrow);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+body.presenting .count-decision .count-value{color:var(--decision-fg)}
+body.presenting .decisions{background:none;border:0;border-radius:0}
+body.presenting[data-presenting-kind="decision"] main{background:var(--decision-bg)}
+body.presenting[data-presenting-kind="decision"] .presentation-rail{background:var(--decision-bg)}
+body.presenting[data-presenting-kind="decision"] .slide .meta,
+body.presenting[data-presenting-kind="decision"] .pres-group>h2{color:var(--decision-fg)}
+body.presenting details.item.slide{display:flex;flex-direction:column;gap:var(--slide-gap);
+  position:relative;overflow:hidden;background:none;border:0;padding:0}
+body.presenting .slide[data-slide-ref]::after{content:attr(data-slide-ref);position:fixed;left:0;
+  bottom:calc(var(--pres-bar) - 1.6rem);font-family:var(--mono);font-weight:700;font-size:var(--slide-ghost);
+  line-height:.8;letter-spacing:-.06em;color:var(--ghost);pointer-events:none;user-select:none;z-index:0}
+body.presenting.overview-open .slide[data-slide-ref]::after{content:none}
+body.presenting .item>summary{display:flex;flex-direction:column;align-items:flex-start;gap:var(--slide-gap);
+  position:relative;z-index:1;cursor:default}
+body.presenting .item>summary::before{content:none}
+body.presenting .item>summary>code{order:0;background:none;border:0;padding:0;font-family:var(--mono);
+  font-size:var(--slide-eyebrow);letter-spacing:.1em;color:var(--muted)}
+body.presenting .item>summary .badges{order:1;display:flex;flex-wrap:wrap;gap:.4rem}
+body.presenting .badge,body.presenting .chip{margin-left:0;font-size:var(--slide-eyebrow);padding:.15rem .75rem}
+body.presenting .item-title{order:2}
+body.presenting .outcome{order:3;font-size:var(--slide-lede);color:var(--muted);margin:0;max-width:var(--body-measure)}
+body.presenting .item-body{position:relative;z-index:1;border-top:0;margin:0;padding:0;
+  display:flex;flex-direction:column;gap:var(--slide-gap)}
+body.presenting .item-body h3{font-size:var(--slide-eyebrow);margin:0;letter-spacing:.12em}
+body.presenting .item-body ul{list-style:none;padding-left:0}
+body.presenting .item-body li{display:flex;gap:.6em;align-items:baseline}
+body.presenting .item-body li::before{content:"";flex:none;width:.7em;height:.7em;border-radius:3px;
+  border:2px solid var(--accent);transform:translateY(.08em)}
+body.presenting .group,body.presenting .sub{border:0;padding:0}
+body.presenting .group>summary,body.presenting .sub>summary{list-style:none;cursor:default}
+body.presenting .group>summary::-webkit-details-marker,body.presenting .sub>summary::-webkit-details-marker{display:none}
+body.presenting .sub>summary{font-size:var(--slide-eyebrow);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+body.presenting .group{column-gap:clamp(1.5rem,4vw,3rem)}
+body.presenting .group>summary{column-span:all;margin-bottom:var(--slide-gap)}
+body.presenting .sub{break-inside:avoid-column;margin-bottom:var(--slide-gap)}
+body.presenting .slide-dense{--slide-title:clamp(1.5rem,2.4vw + .8vh,2.8rem);
+  --slide-lede:clamp(1rem,.9vw + .5vh,1.4rem);--slide-body:clamp(1rem,.75vw + .45vh,1.3rem);
+  --slide-ghost:clamp(4.5rem,11vw,10rem)}
+@media (max-width:640px){
+  body.presenting{--pres-bar:6.4rem}
+  body.presenting .topbar-title{display:none}
+  body.presenting .presentation-bar{left:.5rem;right:.5rem;transform:none;flex-wrap:wrap;justify-content:center;border-radius:14px}
+  body.presenting .presentation-bar button{white-space:nowrap}
+}
+@media (min-width:1100px){
+  body.presenting details.item.slide{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:clamp(1.5rem,4vw,4rem);align-items:start;--slide-title:clamp(1.8rem,2.6vw + .9vh,3.5rem)}
+  body.presenting details.item.slide-dense{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+  body.presenting .group{columns:3}
+}
+@media (prefers-reduced-motion:no-preference){
+  body.presenting .slide.is-entering-forward>*{animation:slide-enter-forward .26s cubic-bezier(.2,.7,.2,1)}
+  body.presenting .slide.is-entering-backward>*{animation:slide-enter-backward .26s cubic-bezier(.2,.7,.2,1)}
+  body.presenting .slide.is-entering-forward::after,
+  body.presenting .slide.is-entering-backward::after{animation:slide-ghost-enter .26s ease-out}
+  @keyframes slide-ghost-enter{from{opacity:0}to{opacity:1}}
+  @keyframes slide-enter-forward{from{opacity:0;transform:translateX(2.5rem)}to{opacity:1;transform:none}}
+  @keyframes slide-enter-backward{from{opacity:0;transform:translateX(-2.5rem)}to{opacity:1;transform:none}}
+}
+body.compact main{font-size:14px;line-height:1.45}
+body.compact .block{margin-bottom:1.4rem}
+body.compact .item{padding:.35rem .7rem}
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr);gap:1.5rem}
+  aside{position:static;max-height:none}
+}
+@media (max-width:480px){
+  .layout{padding:1.25rem .9rem 4rem}
+  .topbar{padding:.5rem .9rem}
+  .topbar-title{max-width:100%}
+  h1{font-size:1.5rem}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{transition:none!important;animation:none!important}
+}
+@media print{
+  :root,:root[data-theme="dark"]{
+    __LIGHT_TOKENS__
+  }
+  .topbar,aside,.presentation-bar,.presentation-rail,.presentation-grid,.agent-block,.agent-note{display:none!important}
+  body{background:var(--surface)}
+  .layout{display:block;max-width:none;padding:0}
+  .item,.block{break-inside:avoid;border-color:var(--print-border)}
+}
+"""
+
+STYLE_CSS = STYLE_TEMPLATE.replace(LIGHT_TOKENS_PLACEHOLDER, LIGHT_TOKENS).replace(
+    DARK_TOKENS_PLACEHOLDER, DARK_TOKENS
+)
+
+THEME_BOOTSTRAP_TEMPLATE = """
+(function(){
+  try {
+    var stored = window.localStorage.getItem("__THEME_KEY__");
+    if (stored === "__DARK_VALUE__" || stored === "__LIGHT_VALUE__") {
+      document.documentElement.setAttribute("__THEME_ATTRIBUTE__", stored);
+    }
+  } catch (error) { return; }
+})();
+"""
+
+THEME_KEY_PLACEHOLDER = "__THEME_KEY__"
+THEME_ATTRIBUTE_PLACEHOLDER = "__THEME_ATTRIBUTE__"
+DARK_VALUE_PLACEHOLDER = "__DARK_VALUE__"
+LIGHT_VALUE_PLACEHOLDER = "__LIGHT_VALUE__"
+
+THEME_BOOTSTRAP_JS = (
+    THEME_BOOTSTRAP_TEMPLATE.replace(THEME_KEY_PLACEHOLDER, THEME_STORAGE_KEY)
+    .replace(THEME_ATTRIBUTE_PLACEHOLDER, THEME_ATTRIBUTE)
+    .replace(DARK_VALUE_PLACEHOLDER, DARK_THEME_VALUE)
+    .replace(LIGHT_VALUE_PLACEHOLDER, LIGHT_THEME_VALUE)
+)
+
+SCRIPT_JS = """
+(function(){
+  var labels = PRD_CONFIG.labels;
+  var INTERACTIVE_TAGS = ["INPUT", "TEXTAREA", "SELECT"];
+  var COUNTER_SEPARATOR = " / ";
+  var LABEL_SEPARATOR = " · ";
+  var COMPACT_VALUE = "compact";
+  var COMFORT_VALUE = "comfort";
+  var VISIBLE_VALUE = "visible";
+  var HIDDEN_VALUE = "hidden";
+  var PRESENTATION_KEY = "d";
+  var OVERVIEW_KEY = "g";
+  var DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
+  var SEGMENT_CLASS = "rail-segment";
+  var TILE_CLASS = "grid-tile";
+  var TILE_REFERENCE_CLASS = "grid-tile-ref";
+  var OVERVIEW_CLASS = "overview-open";
+  var PAST_CLASS = "is-past";
+  var CURRENT_CLASS = "is-current";
+  var FORWARD_CLASS = "is-entering-forward";
+  var BACKWARD_CLASS = "is-entering-backward";
+  var FORWARD_STEP = 1;
+  var BACKWARD_STEP = -1;
+  var densityButton = document.getElementById("density");
+  var themeButton = document.getElementById("theme");
+  var agentButton = document.getElementById("agent-toggle");
+  var expandButton = document.getElementById("expand-all");
+  var presentationButton = document.getElementById("presentation");
+  var presentationBar = document.getElementById("presentation-bar");
+  var presentationCounter = document.getElementById("presentation-counter");
+  var previousButton = document.getElementById("presentation-previous");
+  var nextButton = document.getElementById("presentation-next");
+  var overviewButton = document.getElementById("presentation-overview");
+  var presentationRail = document.getElementById("presentation-rail");
+  var presentationGrid = document.getElementById("presentation-grid");
+  var agentSection = document.getElementById(PRD_CONFIG.agentSectionId);
+  var agentNote = document.getElementById(PRD_CONFIG.agentNoteId);
+  var stage = document.querySelector("main");
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var groups = Array.prototype.slice.call(document.querySelectorAll(".pres-group"));
+  var allDetails = Array.prototype.slice.call(document.querySelectorAll("details"));
+  var agentVisible = false;
+  var expanded = false;
+  var presenting = false;
+  var overviewVisible = false;
+  var slideIndex = 0;
+  var slideDirection = FORWARD_STEP;
+  var printState = null;
+
+  function readStored(key){
+    try { return window.localStorage.getItem(key); } catch (error) { return null; }
+  }
+
+  function writeStored(key, value){
+    try { window.localStorage.setItem(key, value); } catch (error) { return; }
+  }
+
+  function prefersDarkScheme(){
+    if (!window.matchMedia) { return false; }
+    return window.matchMedia(DARK_SCHEME_QUERY).matches;
+  }
+
+  function storedTheme(){
+    return document.documentElement.getAttribute(PRD_CONFIG.themeAttribute);
+  }
+
+  function currentTheme(){
+    var theme = storedTheme();
+    if (theme === PRD_CONFIG.darkTheme || theme === PRD_CONFIG.lightTheme) { return theme; }
+    if (prefersDarkScheme()) { return PRD_CONFIG.darkTheme; }
+    return PRD_CONFIG.lightTheme;
+  }
+
+  function refreshThemeButton(){
+    var dark = currentTheme() === PRD_CONFIG.darkTheme;
+    themeButton.textContent = dark ? labels.lightTheme : labels.darkTheme;
+    themeButton.setAttribute("aria-pressed", dark ? "true" : "false");
+  }
+
+  function applyTheme(theme){
+    document.documentElement.setAttribute(PRD_CONFIG.themeAttribute, theme);
+    writeStored(PRD_CONFIG.themeKey, theme);
+    refreshThemeButton();
+  }
+
+  function watchSchemeChanges(){
+    if (!window.matchMedia) { return; }
+    var query = window.matchMedia(DARK_SCHEME_QUERY);
+    if (!query.addEventListener) { return; }
+    query.addEventListener("change", function(){
+      if (storedTheme()) { return; }
+      refreshThemeButton();
+    });
+  }
+
+  function applyDensity(compact){
+    document.body.classList.toggle(COMPACT_VALUE, compact);
+    densityButton.textContent = compact ? labels.comfort : labels.compact;
+    densityButton.setAttribute("aria-pressed", compact ? "true" : "false");
+  }
+
+  function applyAgentVisibility(){
+    if (agentSection) { agentSection.hidden = presenting || !agentVisible; }
+    if (agentNote) { agentNote.hidden = presenting || agentVisible; }
+    agentButton.textContent = agentVisible ? labels.hideAgent : labels.showAgent;
+    agentButton.setAttribute("aria-pressed", agentVisible ? "true" : "false");
+  }
+
+  function applyExpansion(){
+    allDetails.forEach(function(element){ element.open = expanded; });
+    expandButton.textContent = expanded ? labels.collapseAll : labels.expandAll;
+    expandButton.setAttribute("aria-pressed", expanded ? "true" : "false");
+  }
+
+  function slideKind(slide){
+    return slide.getAttribute(PRD_CONFIG.kindAttribute) || "";
+  }
+
+  function slideTitle(slide){
+    return slide.getAttribute(PRD_CONFIG.titleAttribute) || "";
+  }
+
+  function slideReference(slide){
+    return slide.getAttribute(PRD_CONFIG.referenceAttribute) || "";
+  }
+
+  function kindLabel(kind){
+    var key = PRD_CONFIG.kindLabelKeys[kind];
+    if (!key) { return ""; }
+    return labels[key];
+  }
+
+  function buildSegment(slide, index){
+    var segment = document.createElement("button");
+    segment.type = "button";
+    segment.className = SEGMENT_CLASS;
+    segment.setAttribute(PRD_CONFIG.kindAttribute, slideKind(slide));
+    segment.setAttribute("aria-label", kindLabel(slideKind(slide)) + LABEL_SEPARATOR + slideTitle(slide));
+    segment.addEventListener("click", function(){ goToSlide(index); });
+    return segment;
+  }
+
+  function buildTile(slide, index){
+    var tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = TILE_CLASS;
+    tile.setAttribute(PRD_CONFIG.kindAttribute, slideKind(slide));
+    var reference = document.createElement("span");
+    reference.className = TILE_REFERENCE_CLASS;
+    reference.textContent = slideReference(slide) || kindLabel(slideKind(slide));
+    var title = document.createElement("span");
+    title.textContent = slideTitle(slide);
+    tile.appendChild(reference);
+    tile.appendChild(title);
+    tile.addEventListener("click", function(){
+      setOverview(false);
+      goToSlide(index);
+    });
+    return tile;
+  }
+
+  function buildNavigation(){
+    slides.forEach(function(slide, index){
+      presentationRail.appendChild(buildSegment(slide, index));
+      presentationGrid.appendChild(buildTile(slide, index));
+    });
+  }
+
+  function refreshNavigation(){
+    Array.prototype.forEach.call(presentationRail.children, function(segment, index){
+      segment.classList.toggle(PAST_CLASS, index < slideIndex);
+      segment.classList.toggle(CURRENT_CLASS, index === slideIndex);
+    });
+    Array.prototype.forEach.call(presentationGrid.children, function(tile, index){
+      tile.classList.toggle(CURRENT_CLASS, index === slideIndex);
+    });
+  }
+
+  function animateSlide(slide){
+    slide.classList.remove(FORWARD_CLASS);
+    slide.classList.remove(BACKWARD_CLASS);
+    void slide.offsetWidth;
+    slide.classList.add(slideDirection === BACKWARD_STEP ? BACKWARD_CLASS : FORWARD_CLASS);
+  }
+
+  function openSlideDetails(slide){
+    if (slide.tagName === "DETAILS") { slide.open = true; }
+    Array.prototype.forEach.call(slide.querySelectorAll("details"), function(element){
+      element.open = true;
+    });
+  }
+
+  function setOverview(visible){
+    overviewVisible = visible && presenting;
+    presentationGrid.hidden = !overviewVisible;
+    document.body.classList.toggle(OVERVIEW_CLASS, overviewVisible);
+    overviewButton.setAttribute("aria-pressed", overviewVisible ? "true" : "false");
+  }
+
+  function applyPresentation(){
+    document.body.classList.toggle("presenting", presenting);
+    presentationBar.hidden = !presenting;
+    presentationRail.hidden = !presenting;
+    presentationButton.textContent = presenting ? labels.exitPresentation : labels.presentation;
+    presentationButton.setAttribute("aria-pressed", presenting ? "true" : "false");
+    if (!presenting) {
+      setOverview(false);
+      document.body.removeAttribute(PRD_CONFIG.presentingKindAttribute);
+      slides.forEach(function(slide){
+        slide.hidden = false;
+        slide.classList.remove(FORWARD_CLASS);
+        slide.classList.remove(BACKWARD_CLASS);
+      });
+      groups.forEach(function(group){ group.hidden = false; });
+      applyAgentVisibility();
+      return;
+    }
+    var current = slides[slideIndex];
+    slides.forEach(function(slide, index){ slide.hidden = index !== slideIndex; });
+    groups.forEach(function(group){ group.hidden = !group.contains(current); });
+    if (current) {
+      openSlideDetails(current);
+      animateSlide(current);
+      document.body.setAttribute(PRD_CONFIG.presentingKindAttribute, slideKind(current));
+      if (stage) { stage.scrollTop = 0; }
+    }
+    presentationCounter.textContent = (slideIndex + 1) + COUNTER_SEPARATOR + slides.length;
+    refreshNavigation();
+    applyAgentVisibility();
+    window.scrollTo(0, 0);
+  }
+
+  function goToSlide(index){
+    if (!presenting || slides.length === 0) { return; }
+    slideDirection = index < slideIndex ? BACKWARD_STEP : FORWARD_STEP;
+    slideIndex = Math.min(slides.length - 1, Math.max(0, index));
+    applyPresentation();
+  }
+
+  function moveSlide(offset){
+    if (!presenting || slides.length === 0) { return; }
+    goToSlide(slideIndex + offset);
+  }
+
+  buildNavigation();
+  applyDensity(readStored(PRD_CONFIG.densityKey) === COMPACT_VALUE);
+  agentVisible = readStored(PRD_CONFIG.agentKey) === VISIBLE_VALUE;
+  applyAgentVisibility();
+  applyExpansion();
+  refreshThemeButton();
+  watchSchemeChanges();
+
+  themeButton.addEventListener("click", function(){
+    if (currentTheme() === PRD_CONFIG.darkTheme) {
+      applyTheme(PRD_CONFIG.lightTheme);
+      return;
+    }
+    applyTheme(PRD_CONFIG.darkTheme);
+  });
+
+  densityButton.addEventListener("click", function(){
+    var compact = !document.body.classList.contains(COMPACT_VALUE);
+    writeStored(PRD_CONFIG.densityKey, compact ? COMPACT_VALUE : COMFORT_VALUE);
+    applyDensity(compact);
+  });
+
+  agentButton.addEventListener("click", function(){
+    agentVisible = !agentVisible;
+    writeStored(PRD_CONFIG.agentKey, agentVisible ? VISIBLE_VALUE : HIDDEN_VALUE);
+    applyAgentVisibility();
+  });
+
+  expandButton.addEventListener("click", function(){
+    expanded = !expanded;
+    applyExpansion();
+  });
+
+  presentationButton.addEventListener("click", function(){
+    presenting = !presenting;
+    slideIndex = 0;
+    applyPresentation();
+    presentationButton.blur();
+  });
+
+  previousButton.addEventListener("click", function(){ moveSlide(BACKWARD_STEP); previousButton.blur(); });
+  nextButton.addEventListener("click", function(){ moveSlide(FORWARD_STEP); nextButton.blur(); });
+  overviewButton.addEventListener("click", function(){ setOverview(!overviewVisible); });
+
+  document.addEventListener("keydown", function(event){
+    var target = event.target;
+    if (target && INTERACTIVE_TAGS.indexOf(target.tagName) !== -1) { return; }
+    if (target && target.isContentEditable) { return; }
+    if (event.key === PRESENTATION_KEY) {
+      presenting = !presenting;
+      slideIndex = 0;
+      applyPresentation();
+      return;
+    }
+    if (event.key === OVERVIEW_KEY && presenting) {
+      setOverview(!overviewVisible);
+      return;
+    }
+    if (event.key === "Escape" && overviewVisible) {
+      setOverview(false);
+      return;
+    }
+    if (event.key === "Escape" && presenting) {
+      presenting = false;
+      applyPresentation();
+      return;
+    }
+    if (event.key === "ArrowRight") { moveSlide(FORWARD_STEP); }
+    if (event.key === "ArrowLeft") { moveSlide(BACKWARD_STEP); }
+  });
+
+  window.addEventListener("beforeprint", function(){
+    if (presenting) { presenting = false; applyPresentation(); }
+    printState = allDetails.map(function(element){ return element.open; });
+    allDetails.forEach(function(element){ element.open = true; });
+  });
+
+  window.addEventListener("afterprint", function(){
+    if (!printState) { return; }
+    allDetails.forEach(function(element, index){ element.open = printState[index]; });
+    printState = null;
+  });
+})();
+"""
+
+
 def escape(value):
     return html.escape(value, quote=True)
 
 
-def list_html(items):
+def labels_for(document):
+    return LABELS[document["locale"]]
+
+
+def count_words(text):
+    return len(text.split())
+
+
+def list_html(items, empty_label, list_tag="ul"):
     if not items:
-        return '<p class="empty">None recorded.</p>'
-    return "<ul>" + "".join(f"<li>{escape(item)}</li>" for item in items) + "</ul>"
+        return f'<p class="empty">{escape(empty_label)}</p>'
+    entries = "".join(f"<li>{escape(item)}</li>" for item in items)
+    return f"<{list_tag}>{entries}</{list_tag}>"
 
 
-def section(identifier, title, content):
-    return f'<section aria-labelledby="{identifier}"><h2 id="{identifier}">{escape(title)}</h2>{content}</section>'
+def slide_attributes(kind, title, reference=""):
+    attributes = f' {SLIDE_KIND_ATTRIBUTE}="{escape(kind)}" {SLIDE_TITLE_ATTRIBUTE}="{escape(title)}"'
+    if reference:
+        attributes += f' {SLIDE_REF_ATTRIBUTE}="{escape(reference)}"'
+    return attributes
 
 
-def render_requirements(requirements):
-    rows = []
-    for requirement in requirements:
-        acceptance = list_html(requirement["acceptance"])
-        rows.append(
-            "<tr>"
-            f'<td><code>{escape(requirement["id"])}</code></td>'
-            f'<td>{escape(requirement["kind"])}</td>'
-            f'<td><strong>{escape(requirement["title"])}</strong><br>{escape(requirement["description"])}</td>'
-            f'<td>{escape(requirement["priority"])}</td>'
-            f'<td>{escape(requirement["status"])}</td>'
-            f"<td>{acceptance}</td>"
-            "</tr>"
+def slide_classes(classes, item_count):
+    if item_count > DENSE_SLIDE_ITEM_THRESHOLD:
+        return f"{classes} {SLIDE_DENSE_CLASS}"
+    return classes
+
+
+def block_html(identifier, title, content, classes, extra_attributes=""):
+    heading_id = f"{identifier}-title"
+    return (
+        f'<section id="{identifier}" class="{classes}" aria-labelledby="{heading_id}"{extra_attributes}>'
+        f'<h2 id="{heading_id}">{escape(title)}</h2>{content}</section>'
+    )
+
+
+def uses_default_source_priority(document):
+    return document["preDraft"]["sourcePriority"] == DEFAULT_SOURCE_PRIORITY
+
+
+def reading_minutes(word_count):
+    minutes = -(-word_count // WORDS_PER_MINUTE)
+    return max(MINIMUM_READING_MINUTES, minutes)
+
+
+def visible_words(document):
+    texts = [document["title"], document["summary"]]
+    for field in ("openQuestions", "goals", "outOfScope") + SECONDARY_FIELDS:
+        texts.extend(document[field])
+    texts.extend(document["preDraft"]["sharedSurfaces"])
+    if not uses_default_source_priority(document):
+        texts.extend(document["preDraft"]["sourcePriority"])
+    for requirement in document["requirements"]:
+        texts.append(requirement["title"])
+        texts.append(requirement["description"])
+        texts.extend(requirement["acceptance"])
+    for task in document["tasks"]:
+        texts.append(task["title"])
+        texts.append(task["expectedOutcome"])
+        texts.append(task["startCondition"])
+        texts.extend(task["acceptance"])
+    return sum(count_words(text) for text in texts)
+
+
+def agent_entry_count(document):
+    total = len(document["preDraft"]["reuse"])
+    total += sum(len(task["boundaries"]) for task in document["tasks"])
+    if uses_default_source_priority(document):
+        total += len(document["preDraft"]["sourcePriority"])
+    return total
+
+
+def count_html(labels, key, count, extra_class=""):
+    forms = labels[key]
+    form = forms["one"] if count == SINGULAR_COUNT else forms["many"]
+    prefix, _, suffix = form.partition(COUNT_PLACEHOLDER)
+    classes = f"count {extra_class}".strip()
+    return (
+        f'<span class="{classes}"><span class="count-value">{escape(prefix)}{count}</span>'
+        f'<span class="count-label">{escape(suffix)}</span></span>'
+    )
+
+
+def count_strip_html(document, labels):
+    parts = [
+        count_html(labels, "countRequirements", len(document["requirements"])),
+        count_html(labels, "countTasks", len(document["tasks"])),
+        count_html(labels, "countQuestions", len(document["openQuestions"]), COUNT_DECISION_CLASS),
+        count_html(labels, "countReadingTime", reading_minutes(visible_words(document))),
+    ]
+    separator = f'<span class="count-sep">{escape(COUNT_SEPARATOR)}</span>'
+    return f'<p class="counts">{separator.join(parts)}</p>'
+
+
+def brief_html(document, labels):
+    return (
+        f'<header id="{BRIEF_ID}" class="block slide"'
+        f'{slide_attributes(KIND_CONTEXT, document["title"])}>'
+        f'<p class="meta"><code>{escape(document["id"])}</code>{escape(COUNT_SEPARATOR)}'
+        f'{escape(labels["revision"])} {escape(document["revision"])}</p>'
+        f'<h1>{escape(document["title"])}</h1>'
+        f'<p class="summary">{escape(document["summary"])}</p>'
+        f"{count_strip_html(document, labels)}</header>"
+    )
+
+
+def requirement_html(requirement, labels):
+    priority = escape(requirement["priority"])
+    badges = (
+        '<span class="badges">'
+        f'<span class="badge badge-{priority}">{priority}</span>'
+        f'<span class="badge">{escape(requirement["status"])}</span>'
+        f'<span class="badge">{escape(requirement["kind"])}</span>'
+        "</span>"
+    )
+    classes = slide_classes("item slide", len(requirement["acceptance"]))
+    attributes = slide_attributes(KIND_REQUIREMENT, requirement["title"], requirement["id"])
+    return (
+        f'<details class="{classes}"{attributes}>'
+        f'<summary><code>{escape(requirement["id"])}</code> '
+        f'<span class="item-title">{escape(requirement["title"])}</span>{badges}</summary>'
+        f'<div class="item-body"><p>{escape(requirement["description"])}</p>'
+        f'<h3>{escape(labels["acceptance"])}</h3>'
+        f'{list_html(requirement["acceptance"], labels["empty"])}</div>'
+        "</details>"
+    )
+
+
+def requirements_html(requirements, labels):
+    must_items = [item for item in requirements if item["priority"] == MUST_PRIORITY]
+    other_items = [item for item in requirements if item["priority"] != MUST_PRIORITY]
+    parts = []
+    for heading, group in ((labels["mustGroup"], must_items), (labels["otherGroup"], other_items)):
+        if not group:
+            continue
+        parts.append(f"<h3>{escape(heading)}</h3>")
+        parts.extend(requirement_html(item, labels) for item in group)
+    return "".join(parts)
+
+
+def task_html(task, labels):
+    chip = ""
+    if task["dependsOn"]:
+        dependencies = DEPENDENCY_SEPARATOR.join(task["dependsOn"])
+        chip = (
+            '<span class="badges">'
+            f'<span class="chip">{escape(labels["afterChip"].format(dependencies=dependencies))}</span>'
+            "</span>"
         )
-    return '<div class="table-wrap"><table><thead><tr><th>ID</th><th>Kind</th><th>Requirement</th><th>Priority</th><th>Status</th><th>Acceptance</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table></div>"
+    classes = slide_classes("item slide", len(task["acceptance"]))
+    attributes = slide_attributes(KIND_TASK, task["title"], task["id"])
+    return (
+        f'<details class="{classes}"{attributes}>'
+        f'<summary><code>{escape(task["id"])}</code> '
+        f'<span class="item-title">{escape(task["title"])}</span>{chip}'
+        f'<span class="outcome">{escape(task["expectedOutcome"])}</span></summary>'
+        f'<div class="item-body"><h3>{escape(labels["startCondition"])}</h3>'
+        f'<p>{escape(task["startCondition"])}</p>'
+        f'<h3>{escape(labels["acceptance"])}</h3>'
+        f'{list_html(task["acceptance"], labels["empty"])}</div>'
+        "</details>"
+    )
 
 
-def render_tasks(tasks):
-    cards = []
-    for task in tasks:
-        dependencies = ", ".join(task["dependsOn"]) or "None"
-        cards.append(
-            '<article class="task">'
-            f'<h3><input type="checkbox" disabled aria-label="{escape(task["id"])} complete"> <code>{escape(task["id"])}</code> {escape(task["title"])}</h3>'
-            f'<dl><dt>Expected outcome</dt><dd>{escape(task["expectedOutcome"])}</dd>'
-            f'<dt>Dependencies / start condition</dt><dd>{escape(task["startCondition"])}<br><span class="muted">Depends on: {escape(dependencies)}</span></dd>'
-            f'<dt>Observable acceptance criteria</dt><dd>{list_html(task["acceptance"])}</dd>'
-            f'<dt>Relevant boundaries</dt><dd>{list_html(task["boundaries"])}</dd></dl>'
-            "</article>"
-        )
-    return "".join(cards)
+def secondary_html(document, labels):
+    entries = "".join(
+        f'<details class="sub"><summary>{escape(labels[field])}</summary>'
+        f'{list_html(document[field], labels["empty"])}</details>'
+        for field in SECONDARY_FIELDS
+    )
+    heading = f'<h2 id="{SECONDARY_ID}-title">{escape(labels["secondary"])}</h2>'
+    item_count = sum(len(document[field]) for field in SECONDARY_FIELDS)
+    classes = slide_classes("block slide", item_count)
+    attributes = slide_attributes(KIND_CONTEXT, labels["secondary"])
+    return (
+        f'<section id="{SECONDARY_ID}" class="{classes}" aria-labelledby="{SECONDARY_ID}-title"{attributes}>'
+        f'<details class="group"><summary>{heading}</summary>{entries}</details>'
+        "</section>"
+    )
+
+
+def source_priority_html(pre_draft, labels):
+    return (
+        f'<h3>{escape(labels["sourcePriority"])}</h3>'
+        f'{list_html(pre_draft["sourcePriority"], labels["empty"])}'
+    )
+
+
+def agent_context_html(document, labels):
+    pre_draft = document["preDraft"]
+    parts = [f'<h3>{escape(labels["reuse"])}</h3>', list_html(pre_draft["reuse"], labels["empty"])]
+    if uses_default_source_priority(document):
+        parts.append(source_priority_html(pre_draft, labels))
+    for task in document["tasks"]:
+        parts.append(f"<h3>{escape(task['id'])}{escape(COUNT_SEPARATOR)}{escape(task['title'])}</h3>")
+        parts.append(list_html(task["boundaries"], labels["empty"]))
+    return block_html(
+        AGENT_CONTEXT_ID,
+        labels["agentContext"],
+        "".join(parts),
+        "block agent-block",
+        extra_attributes=" hidden",
+    )
+
+
+def impact_html(document, labels):
+    pre_draft = document["preDraft"]
+    parts = [list_html(pre_draft["sharedSurfaces"], labels["empty"])]
+    item_count = len(pre_draft["sharedSurfaces"])
+    if not uses_default_source_priority(document):
+        parts.append(source_priority_html(pre_draft, labels))
+        item_count += len(pre_draft["sourcePriority"])
+    return block_html(
+        IMPACT_ID,
+        labels["impact"],
+        "".join(parts),
+        slide_classes("block slide", item_count),
+        extra_attributes=slide_attributes(KIND_CONTEXT, labels["impact"]),
+    )
+
+
+def list_block(document, labels, entry):
+    identifier, label_key, field, classes, list_tag, kind = entry
+    title = labels[label_key]
+    content = list_html(document[field], labels["empty"], list_tag=list_tag)
+    markup = block_html(
+        identifier,
+        title,
+        content,
+        slide_classes(classes, len(document[field])),
+        extra_attributes=slide_attributes(kind, title),
+    )
+    return (identifier, title, markup)
+
+
+def build_blocks(document, labels):
+    blocks = [list_block(document, labels, entry) for entry in LIST_BLOCKS]
+    requirements = block_html(
+        REQUIREMENTS_ID,
+        labels["requirements"],
+        requirements_html(document["requirements"], labels),
+        "block pres-group",
+    )
+    tasks = block_html(
+        TASKS_ID,
+        labels["tasks"],
+        "".join(task_html(task, labels) for task in document["tasks"]),
+        "block pres-group",
+    )
+    blocks.extend(
+        [
+            (REQUIREMENTS_ID, labels["requirements"], requirements),
+            (TASKS_ID, labels["tasks"], tasks),
+            (SECONDARY_ID, labels["secondary"], secondary_html(document, labels)),
+            (IMPACT_ID, labels["impact"], impact_html(document, labels)),
+            (AGENT_CONTEXT_ID, labels["agentContext"], agent_context_html(document, labels)),
+        ]
+    )
+    return blocks
+
+
+def toolbar_html(labels):
+    buttons = "".join(
+        f'<button id="{identifier}" type="button" aria-pressed="false">{escape(labels[label_key])}</button>'
+        for identifier, label_key in TOOLBAR_BUTTONS
+    )
+    return f'<div class="toolbar">{buttons}</div>'
+
+
+def presentation_bar_html(labels):
+    return (
+        f'<div id="{PRESENTATION_RAIL_ID}" class="presentation-rail" hidden></div>'
+        f'<div id="{PRESENTATION_GRID_ID}" class="presentation-grid" hidden></div>'
+        '<div id="presentation-bar" class="presentation-bar" hidden>'
+        f'<button id="presentation-previous" type="button">{escape(labels["previous"])}</button>'
+        '<span id="presentation-counter" class="presentation-counter"></span>'
+        f'<button id="presentation-next" type="button">{escape(labels["next"])}</button>'
+        f'<button id="{PRESENTATION_OVERVIEW_ID}" type="button" aria-pressed="false">'
+        f'{escape(labels["overview"])}</button>'
+        "</div>"
+    )
+
+
+def script_config_html(labels):
+    config = {
+        "labels": labels,
+        "densityKey": DENSITY_STORAGE_KEY,
+        "agentKey": AGENT_STORAGE_KEY,
+        "themeKey": THEME_STORAGE_KEY,
+        "themeAttribute": THEME_ATTRIBUTE,
+        "darkTheme": DARK_THEME_VALUE,
+        "lightTheme": LIGHT_THEME_VALUE,
+        "agentSectionId": AGENT_CONTEXT_ID,
+        "agentNoteId": AGENT_NOTE_ID,
+        "kindAttribute": SLIDE_KIND_ATTRIBUTE,
+        "titleAttribute": SLIDE_TITLE_ATTRIBUTE,
+        "referenceAttribute": SLIDE_REF_ATTRIBUTE,
+        "presentingKindAttribute": PRESENTING_KIND_ATTRIBUTE,
+        "kindLabelKeys": KIND_LABEL_KEYS,
+    }
+    payload = json.dumps(config, ensure_ascii=False).replace("<", "\\u003c")
+    return f"<script>const PRD_CONFIG = {payload};</script>"
 
 
 def render_document(document):
-    labels = {
-        "preDraft": "Pre-draft findings",
-        "goals": "Goals / Objectives",
-        "users": "Target audience / User personas",
-        "userStories": "User stories / Use cases",
-        "requirements": "Requirements",
-        "designConsiderations": "Design considerations / Mockups",
-        "successMetrics": "Success metrics",
-        "outOfScope": "Out of scope",
-        "openQuestions": "Open questions / Future considerations",
-        "tasks": "Tasks",
-    }
-    pre_draft = document["preDraft"]
-    pre_draft_html = (
-        "<h3>Reuse map</h3>" + list_html(pre_draft["reuse"])
-        + "<h3>Shared-surface impact and strategy</h3>" + list_html(pre_draft["sharedSurfaces"])
-        + "<h3>Source-priority order</h3>" + list_html(pre_draft["sourcePriority"])
-    )
-    sections = [
-        section("pre-draft", labels["preDraft"], pre_draft_html),
-        section("goals", labels["goals"], list_html(document["goals"])),
-        section("users", labels["users"], list_html(document["users"])),
-        section("user-stories", labels["userStories"], list_html(document["userStories"])),
-        section("requirements", labels["requirements"], render_requirements(document["requirements"])),
-        section("design", labels["designConsiderations"], list_html(document["designConsiderations"])),
-        section("metrics", labels["successMetrics"], list_html(document["successMetrics"])),
-        section("out-of-scope", labels["outOfScope"], list_html(document["outOfScope"])),
-        section("open-questions", labels["openQuestions"], list_html(document["openQuestions"])),
-        section("tasks", labels["tasks"], render_tasks(document["tasks"])),
-    ]
+    labels = labels_for(document)
+    blocks = build_blocks(document, labels)
     navigation = "".join(
-        f'<li><a href="#{identifier}">{escape(label)}</a></li>'
-        for identifier, label in [
-            ("pre-draft", labels["preDraft"]), ("goals", labels["goals"]),
-            ("users", labels["users"]), ("user-stories", labels["userStories"]),
-            ("requirements", labels["requirements"]), ("design", labels["designConsiderations"]),
-            ("metrics", labels["successMetrics"]), ("out-of-scope", labels["outOfScope"]),
-            ("open-questions", labels["openQuestions"]), ("tasks", labels["tasks"]),
-        ]
+        f'<li><a href="#{identifier}">{escape(title)}</a></li>' for identifier, title, _ in blocks
     )
-    language = escape(document["locale"])
-    title = escape(document["title"])
-    summary = escape(document["summary"])
-    document_id = escape(document["id"])
-    revision = escape(document["revision"])
-    body = "".join(sections)
-    return f'''<!doctype html>
-<html lang="{language}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title}</title>
-<style>
-:root{{--bg:#f6f7fb;--surface:#fff;--fg:#1f2430;--muted:#5b6270;--border:#e4e7ee;--accent:#4f46e5;--soft:#eef2ff}}
-*{{box-sizing:border-box}}html{{color-scheme:light;scroll-behavior:smooth}}body{{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}body::before{{content:"";display:block;height:6px;background:linear-gradient(90deg,#4f46e5,#7c3aed,#db2777)}}.layout{{display:grid;grid-template-columns:15rem minmax(0,1fr);gap:2.5rem;max-width:80rem;margin:auto;padding:2rem 1.5rem 5rem}}aside{{position:sticky;top:1rem;align-self:start;max-height:calc(100vh - 2rem);overflow:auto}}main{{min-width:0}}h1{{font-size:2.1rem;line-height:1.2;margin:.5rem 0}}h2{{font-size:1.3rem;margin-top:3rem;padding-bottom:.4rem;border-bottom:1px solid var(--border);scroll-margin-top:1rem}}h2::before{{content:"";display:inline-block;width:.55rem;height:.55rem;border-radius:2px;background:var(--accent);margin-right:.55rem}}h3{{margin-top:1.5rem}}a{{color:var(--accent)}}code{{background:#f1f3f8;border:1px solid var(--border);border-radius:5px;padding:.08em .35em}}nav,.task{{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.1rem;box-shadow:0 1px 3px #1f24300f}}nav strong{{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}}nav ul{{list-style:none;padding:0;margin:.5rem 0 0}}nav a{{display:block;text-decoration:none;color:var(--fg);font-size:.88rem;padding:.14rem 0}}nav a:hover{{color:var(--accent)}}.summary{{font-size:1.12rem;max-width:52rem}}.meta,.muted,.empty{{color:var(--muted)}}section:first-of-type{{background:var(--soft);border:1px solid #c7d2fe;border-radius:12px;padding:0 1.2rem 1rem;margin-top:2rem}}section:first-of-type h2{{margin-top:1rem}}.table-wrap{{overflow-x:auto}}table{{border-collapse:collapse;width:100%;background:var(--surface)}}th,td{{border:1px solid var(--border);padding:.6rem .7rem;text-align:left;vertical-align:top}}th{{background:var(--soft);font-size:.8rem;text-transform:uppercase}}td ul{{margin:0;padding-left:1.1rem}}.task{{margin:1rem 0}}.task h3{{margin:.1rem 0 1rem}}.task input{{accent-color:var(--accent)}}dl{{margin:0}}dt{{font-weight:700;margin-top:.75rem}}dd{{margin:.15rem 0 0}}dd ul{{margin:.2rem 0}}button{{margin-top:.8rem;border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:99px;padding:.5rem .9rem;cursor:pointer}}body.compact main{{font-size:14px;line-height:1.4}}body.compact h2{{margin-top:1.7rem}}body.compact .task{{padding:.65rem .9rem}}@media(max-width:900px){{.layout{{grid-template-columns:1fr}}aside{{position:static;max-height:none}}}}@media print{{body::before,aside{{display:none}}.layout{{display:block;padding:0}}.task{{break-inside:avoid}}}}
-</style>
-</head>
-<body>
-<div class="layout"><aside><nav aria-label="Document sections"><strong>Contents</strong><ul>{navigation}</ul></nav><button id="density" type="button">Compact mode</button></aside><main><header><p class="meta"><code>{document_id}</code> · Revision {revision}</p><h1>{title}</h1><p class="summary">{summary}</p></header>{body}</main></div>
-<script>const button=document.getElementById("density");const apply=compact=>{{document.body.classList.toggle("compact",compact);button.textContent=compact?"Comfort mode":"Compact mode"}};apply(localStorage.getItem("prd-density")==="compact");button.addEventListener("click",()=>{{const compact=!document.body.classList.contains("compact");localStorage.setItem("prd-density",compact?"compact":"comfort");apply(compact)}});</script>
-</body>
-</html>'''
+    body = brief_html(document, labels) + "".join(markup for _, _, markup in blocks)
+    note = labels["agentHiddenNote"].format(count=agent_entry_count(document))
+    agent_note = f'<p class="agent-note" id="{AGENT_NOTE_ID}">{escape(note)}</p>'
+    return (
+        "<!doctype html>\n"
+        f'<html lang="{escape(document["locale"])}">\n'
+        "<head>\n"
+        '<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f'<title>{escape(document["title"])}</title>\n'
+        f"<style>{STYLE_CSS}</style>\n"
+        f"<script>{THEME_BOOTSTRAP_JS}</script>\n"
+        "</head>\n"
+        "<body>\n"
+        f'<div class="topbar"><span class="topbar-title">{escape(document["title"])}</span>'
+        f"{toolbar_html(labels)}</div>\n"
+        '<div class="layout">'
+        f'<aside><nav aria-label="{escape(labels["contents"])}"><strong>{escape(labels["contents"])}</strong>'
+        f"<ul>{navigation}</ul></nav></aside>"
+        f"<main>{body}{agent_note}</main></div>\n"
+        f"{presentation_bar_html(labels)}\n"
+        f"{script_config_html(labels)}\n"
+        f"<script>{SCRIPT_JS}</script>\n"
+        "</body>\n"
+        "</html>\n"
+    )
+
+
+def budget_warning(path, unit_count, budget, unit):
+    return f"{WARNING_PREFIX}{path} has {unit_count} {unit} (budget {budget})"
+
+
+def check_text_budget(text, path, budget, warnings):
+    words = count_words(text)
+    if words > budget:
+        warnings.append(budget_warning(path, words, budget, "words"))
+
+
+def check_acceptance_budget(acceptance, path, warnings):
+    for position, item in enumerate(acceptance):
+        check_text_budget(item, f"{path}.acceptance[{position}]", ACCEPTANCE_WORD_BUDGET, warnings)
+
+
+def collect_warnings(document):
+    warnings = []
+    check_text_budget(document["summary"], "summary", SUMMARY_WORD_BUDGET, warnings)
+    for field in BUDGETED_LIST_FIELDS:
+        for index, item in enumerate(document[field]):
+            check_text_budget(item, f"{field}[{index}]", LIST_ITEM_WORD_BUDGET, warnings)
+    must_count = 0
+    for index, requirement in enumerate(document["requirements"]):
+        path = f"requirements[{index}]"
+        acceptance = requirement["acceptance"]
+        check_text_budget(requirement["description"], f"{path}.description", REQUIREMENT_DESCRIPTION_WORD_BUDGET, warnings)
+        check_acceptance_budget(acceptance, path, warnings)
+        if len(acceptance) > MAX_ACCEPTANCE_ITEMS:
+            warnings.append(budget_warning(f"{path}.acceptance", len(acceptance), MAX_ACCEPTANCE_ITEMS, "items"))
+        if requirement["priority"] == MUST_PRIORITY:
+            must_count += 1
+    if must_count > MAX_MUST_REQUIREMENTS:
+        warnings.append(budget_warning("requirements", must_count, MAX_MUST_REQUIREMENTS, "must items"))
+    for index, task in enumerate(document["tasks"]):
+        path = f"tasks[{index}]"
+        check_text_budget(task["expectedOutcome"], f"{path}.expectedOutcome", EXPECTED_OUTCOME_WORD_BUDGET, warnings)
+        check_acceptance_budget(task["acceptance"], path, warnings)
+    return warnings
+
+
+def report_warnings(warnings):
+    for warning in warnings:
+        print(warning, file=sys.stderr)
+    print(f"{WARNING_PREFIX}{len(warnings)} budget warnings", file=sys.stderr)
 
 
 def main():
@@ -329,6 +1367,7 @@ def main():
         raise SystemExit(f"validation failed:\n{details}")
     output_path.write_text(render_document(document), encoding="utf-8")
     print(output_path)
+    report_warnings(collect_warnings(document))
 
 
 if __name__ == "__main__":
