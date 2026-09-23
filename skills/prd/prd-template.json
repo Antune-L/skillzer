@@ -1,6 +1,6 @@
 {
   "$schema": "./schemas/prd.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "saved-searches",
   "revision": "1",
   "title": "Saved catalogue searches",
@@ -12,26 +12,36 @@
     "sourcePriority": ["user instruction", "Figma mockup", "business document", "existing code"]
   },
   "goals": ["At least 80% of saved searches restore the same filter state during the first 30 days."],
+  "axes": [
+    {"id": "A1", "title": "Capture and persist a search", "summary": "Store the current query and filters under a name the buyer owns."},
+    {"id": "A2", "title": "Restore a search accessibly", "summary": "Bring back a stored search in the catalogue, keyboard included."}
+  ],
+  "sources": [
+    {"title": "Saved searches brief", "ref": "https://www.notion.so/workspace/Saved-searches-brief"},
+    {"title": "Catalogue filters component", "ref": "apps/web/src/catalogue/CatalogueFilters.tsx"}
+  ],
   "users": ["Returning buyers who repeatedly search the same product families."],
   "userStories": ["As a returning buyer, I can name and save my current search so that I can restore it later."],
   "requirements": [
     {
       "id": "FR1",
+      "axis": "A1",
       "kind": "functional",
       "title": "Save the current search",
       "description": "An authenticated buyer can save the current query and filters under a unique name.",
       "priority": "must",
       "status": "proposed",
-      "acceptance": ["The saved entry contains the query and every active filter.", "A duplicate name asks the buyer to choose another name."]
+      "acceptance": ["When the buyer saves, the entry contains the query and every active filter.", "If the name already exists, then the buyer is asked to choose another name."]
     },
     {
       "id": "NFR1",
+      "axis": "A2",
       "kind": "non-functional",
       "title": "Keyboard access",
       "description": "Every save and restore action remains operable with a keyboard.",
       "priority": "must",
       "status": "proposed",
-      "acceptance": ["Focus order follows the visible controls and the dialog returns focus to its trigger."]
+      "acceptance": ["Focus order follows the visible controls and the dialog returns focus to its trigger.", "If the dialog is dismissed with Escape, then focus returns to its trigger."]
     }
   ],
   "designConsiderations": ["Use the existing catalogue dialog and form controls."],
@@ -41,6 +51,7 @@
   "tasks": [
     {
       "id": "T1",
+      "axis": "A1",
       "title": "Persist saved searches",
       "expectedOutcome": "An authenticated buyer can create, rename and delete a private saved search.",
       "startCondition": "None — can start independently",
@@ -50,6 +61,7 @@
     },
     {
       "id": "T2",
+      "axis": "A2",
       "title": "Restore a saved search",
       "expectedOutcome": "Selecting a saved search restores its query and filters in the catalogue.",
       "startCondition": "T1 has established the saved-search contract.",

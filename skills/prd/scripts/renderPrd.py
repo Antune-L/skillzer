@@ -1,3 +1,4 @@
+import argparse
 import html
 import json
 import re
@@ -15,6 +16,8 @@ TOP_LEVEL_FIELDS = {
     "locale",
     "preDraft",
     "goals",
+    "axes",
+    "sources",
     "users",
     "userStories",
     "requirements",
@@ -26,8 +29,10 @@ TOP_LEVEL_FIELDS = {
 }
 REQUIRED_TOP_LEVEL_FIELDS = TOP_LEVEL_FIELDS - {"$schema"}
 PRE_DRAFT_FIELDS = {"reuse", "sharedSurfaces", "sourcePriority"}
-REQUIREMENT_FIELDS = {"id", "kind", "title", "description", "priority", "status", "acceptance"}
-TASK_FIELDS = {"id", "title", "expectedOutcome", "startCondition", "dependsOn", "acceptance", "boundaries"}
+AXIS_FIELDS = {"id", "title", "summary"}
+SOURCE_FIELDS = {"title", "ref"}
+REQUIREMENT_FIELDS = {"id", "axis", "kind", "title", "description", "priority", "status", "acceptance"}
+TASK_FIELDS = {"id", "axis", "title", "expectedOutcome", "startCondition", "dependsOn", "acceptance", "boundaries"}
 TEXT_ARRAY_FIELDS = {
     "goals",
     "users",
@@ -39,6 +44,9 @@ TEXT_ARRAY_FIELDS = {
 }
 IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 TASK_IDENTIFIER_PATTERN = re.compile(r"^T[1-9][0-9]*$")
+AXIS_IDENTIFIER_PATTERN = re.compile(r"^A[1-9][0-9]*$")
+SCHEMA_VERSION = 2
+MAX_AXES = 5
 
 
 def require_object(value, path, errors):
@@ -88,8 +96,8 @@ def validate_document(document):
     require_fields(document, REQUIRED_TOP_LEVEL_FIELDS, TOP_LEVEL_FIELDS, "$", errors)
     if errors:
         return errors
-    if document["schemaVersion"] != 1:
-        errors.append("$.schemaVersion: expected 1")
+    if document["schemaVersion"] != SCHEMA_VERSION:
+        errors.append(f"$.schemaVersion: expected {SCHEMA_VERSION}")
     if "$schema" in document:
         require_text(document["$schema"], "$.$schema", errors)
     require_text(document["id"], "$.id", errors, IDENTIFIER_PATTERN)
@@ -101,11 +109,68 @@ def validate_document(document):
     for field in TEXT_ARRAY_FIELDS:
         require_text_array(document[field], f"$.{field}", errors)
     validate_pre_draft(document["preDraft"], errors)
-    requirement_ids = validate_requirements(document["requirements"], errors)
-    validate_tasks(document["tasks"], errors)
+    validate_sources(document["sources"], errors)
+    axis_ids = validate_axes(document["axes"], errors)
+    requirement_ids, covered_axes = validate_requirements(document["requirements"], errors, axis_ids)
+    validate_tasks(document["tasks"], errors, axis_ids)
     if len(requirement_ids) != len(set(requirement_ids)):
         errors.append("$.requirements: requirement IDs must be unique")
+    for axis_id in axis_ids:
+        if axis_id not in covered_axes:
+            errors.append(f"$.axes: axis '{axis_id}' has no requirement")
     return errors
+
+
+def validate_sources(sources, errors):
+    if not isinstance(sources, list):
+        errors.append("$.sources: expected an array")
+        return
+    entries = []
+    for index, source in enumerate(sources):
+        path = f"$.sources[{index}]"
+        if not require_object(source, path, errors):
+            continue
+        require_fields(source, SOURCE_FIELDS, SOURCE_FIELDS, path, errors)
+        if SOURCE_FIELDS - source.keys():
+            continue
+        title_is_text = require_text(source["title"], f"{path}.title", errors)
+        ref_is_text = require_text(source["ref"], f"{path}.ref", errors)
+        if title_is_text and ref_is_text:
+            entries.append((source["title"], source["ref"]))
+    if len(entries) != len(set(entries)):
+        errors.append("$.sources: duplicate items are not allowed")
+
+
+def validate_axes(axes, errors):
+    if not isinstance(axes, list) or not axes:
+        errors.append("$.axes: expected at least one axis")
+        return []
+    if len(axes) > MAX_AXES:
+        errors.append(f"$.axes: expected at most {MAX_AXES} axes")
+    identifiers = []
+    for index, axis in enumerate(axes):
+        path = f"$.axes[{index}]"
+        if not require_object(axis, path, errors):
+            continue
+        require_fields(axis, AXIS_FIELDS, AXIS_FIELDS, path, errors)
+        if AXIS_FIELDS - axis.keys():
+            continue
+        if require_text(axis["id"], f"{path}.id", errors, AXIS_IDENTIFIER_PATTERN):
+            identifiers.append(axis["id"])
+        require_text(axis["title"], f"{path}.title", errors)
+        require_text(axis["summary"], f"{path}.summary", errors)
+    if len(identifiers) != len(set(identifiers)):
+        errors.append("$.axes: axis IDs must be unique")
+    return identifiers
+
+
+def validate_axis_reference(value, path, errors, axis_ids):
+    if not require_text(value, path, errors, AXIS_IDENTIFIER_PATTERN):
+        return None
+    if axis_ids and value not in axis_ids:
+        errors.append(f"{path}: unknown axis '{value}'")
+        return None
+    return value
 
 
 def validate_pre_draft(pre_draft, errors):
@@ -119,11 +184,12 @@ def validate_pre_draft(pre_draft, errors):
     require_text_array(pre_draft["sourcePriority"], "$.preDraft.sourcePriority", errors, non_empty=True)
 
 
-def validate_requirements(requirements, errors):
+def validate_requirements(requirements, errors, axis_ids):
     if not isinstance(requirements, list) or not requirements:
         errors.append("$.requirements: expected at least one requirement")
-        return []
+        return [], set()
     identifiers = []
+    covered_axes = set()
     for index, requirement in enumerate(requirements):
         path = f"$.requirements[{index}]"
         if not require_object(requirement, path, errors):
@@ -133,6 +199,9 @@ def validate_requirements(requirements, errors):
             continue
         if require_text(requirement["id"], f"{path}.id", errors, IDENTIFIER_PATTERN):
             identifiers.append(requirement["id"])
+        axis = validate_axis_reference(requirement["axis"], f"{path}.axis", errors, axis_ids)
+        if axis is not None:
+            covered_axes.add(axis)
         require_text(requirement["title"], f"{path}.title", errors)
         require_text(requirement["description"], f"{path}.description", errors)
         if requirement["kind"] not in {"functional", "non-functional"}:
@@ -142,10 +211,10 @@ def validate_requirements(requirements, errors):
         if requirement["status"] not in {"proposed", "approved", "deferred"}:
             errors.append(f"{path}.status: unsupported value")
         require_text_array(requirement["acceptance"], f"{path}.acceptance", errors, non_empty=True)
-    return identifiers
+    return identifiers, covered_axes
 
 
-def validate_tasks(tasks, errors):
+def validate_tasks(tasks, errors, axis_ids):
     if not isinstance(tasks, list) or not tasks:
         errors.append("$.tasks: expected at least one task")
         return
@@ -161,6 +230,7 @@ def validate_tasks(tasks, errors):
         valid_identifier = require_text(task["id"], f"{path}.id", errors, TASK_IDENTIFIER_PATTERN)
         if valid_identifier:
             identifiers.append(task["id"])
+        validate_axis_reference(task["axis"], f"{path}.axis", errors, axis_ids)
         require_text(task["title"], f"{path}.title", errors)
         require_text(task["expectedOutcome"], f"{path}.expectedOutcome", errors)
         require_text(task["startCondition"], f"{path}.startCondition", errors)
@@ -207,6 +277,7 @@ WORDS_PER_MINUTE = 200
 MINIMUM_READING_MINUTES = 1
 SINGULAR_COUNT = 1
 SUMMARY_WORD_BUDGET = 60
+AXIS_SUMMARY_WORD_BUDGET = 20
 LIST_ITEM_WORD_BUDGET = 25
 REQUIREMENT_DESCRIPTION_WORD_BUDGET = 40
 ACCEPTANCE_WORD_BUDGET = 30
@@ -227,40 +298,62 @@ COUNT_SEPARATOR = " · "
 COUNT_PLACEHOLDER = "{count}"
 COUNT_DECISION_CLASS = "count-decision"
 DEPENDENCY_SEPARATOR = ", "
+SOURCE_SEPARATOR = ", "
+LINK_PREFIXES = ("http://", "https://")
 SLIDE_KIND_ATTRIBUTE = "data-slide-kind"
 SLIDE_TITLE_ATTRIBUTE = "data-slide-title"
 SLIDE_REF_ATTRIBUTE = "data-slide-ref"
+SLIDE_KEY_ATTRIBUTE = "data-slide-key"
 PRESENTING_KIND_ATTRIBUTE = "data-presenting-kind"
 SLIDE_DENSE_CLASS = "slide-dense"
 DENSE_SLIDE_ITEM_THRESHOLD = 4
 KIND_CONTEXT = "context"
 KIND_DECISION = "decision"
+KIND_AXIS = "axis"
 KIND_REQUIREMENT = "requirement"
 KIND_TASK = "task"
 KIND_LABEL_KEYS = {
     KIND_CONTEXT: "kindContext",
     KIND_DECISION: "kindDecision",
+    KIND_AXIS: "kindAxis",
     KIND_REQUIREMENT: "kindRequirement",
     KIND_TASK: "kindTask",
 }
+AXIS_KEY_PREFIX = "axis:"
+REQUIREMENT_KEY_PREFIX = "requirement:"
+TASK_KEY_PREFIX = "task:"
+AXIS_ANCHOR_PREFIX = "axis-"
+REQUIREMENT_ANCHOR_PREFIX = "req-"
+TASK_ANCHOR_PREFIX = "task-"
+SLIDE_TARGET_ATTRIBUTE = "data-slide-target"
 PRESENTATION_RAIL_ID = "presentation-rail"
 PRESENTATION_GRID_ID = "presentation-grid"
 PRESENTATION_OVERVIEW_ID = "presentation-overview"
+PAGE_HEAD_ID = "page-head"
+CHANGES_ID = "changes"
 BRIEF_ID = "brief"
 DECISIONS_ID = "decisions"
-GOALS_ID = "goals"
+AXES_ID = "axes"
 OUT_OF_SCOPE_ID = "out-of-scope"
-REQUIREMENTS_ID = "requirements"
-TASKS_ID = "tasks"
 SECONDARY_ID = "secondary"
 IMPACT_ID = "impact"
 AGENT_CONTEXT_ID = "agent-context"
+AGENT_NAV_ID = "agent-context-nav"
 AGENT_NOTE_ID = "agent-note"
-LIST_BLOCKS = (
-    (DECISIONS_ID, "decisions", "openQuestions", "block slide decisions", "ol", KIND_DECISION),
-    (GOALS_ID, "goals", "goals", "block slide", "ul", KIND_CONTEXT),
-    (OUT_OF_SCOPE_ID, "outOfScope", "outOfScope", "block slide", "ul", KIND_CONTEXT),
-)
+CHANGES_BUTTON_ID = "changes-only"
+DEPENDENCIES_PLACEHOLDER = "{dependencies}"
+CHANGE_NEW = "new"
+CHANGE_MODIFIED = "changed"
+CHANGE_SAME = "same"
+CHANGE_ATTRIBUTE = "data-change"
+CHANGE_LABEL_KEYS = {CHANGE_NEW: "changeNew", CHANGE_MODIFIED: "changeModified"}
+DIFFED_FIELDS = ("axes", "requirements", "tasks")
+QUESTIONS_FIELD = "openQuestions"
+ID_FIELD = "id"
+REVISION_FIELD = "revision"
+SCHEMA_VERSION_FIELD = "schemaVersion"
+NOTE_PREFIX = "note: "
+OUT_OF_SCOPE_BLOCK = (OUT_OF_SCOPE_ID, "outOfScope", "outOfScope", "block slide", "ul", KIND_CONTEXT)
 TOOLBAR_BUTTONS = (
     ("density", "compact"),
     ("agent-toggle", "showAgent"),
@@ -268,6 +361,25 @@ TOOLBAR_BUTTONS = (
     ("presentation", "presentation"),
     ("theme", "darkTheme"),
 )
+CHANGES_TOOLBAR_BUTTON = (CHANGES_BUTTON_ID, "changesOnly")
+VAGUE_WORDS = {
+    "fr": (
+        "rapide", "rapidement", "intuitif", "intuitive", "robuste", "fluide", "simple", "simplement",
+        "sécurisé", "sécurisée", "performant", "performante", "ergonomique", "convivial", "efficace",
+    ),
+    "en": (
+        "fast", "quickly", "intuitive", "robust", "seamless", "simple", "easy", "secure", "performant",
+        "user-friendly", "efficient",
+    ),
+}
+VAGUE_WORD_PATTERNS = {
+    locale: re.compile(r"\b(?:" + "|".join(re.escape(word) for word in words) + r")\b", re.IGNORECASE)
+    for locale, words in VAGUE_WORDS.items()
+}
+EDGE_CASE_PATTERNS = {
+    "fr": re.compile(r"^(?:Si|S['’]il)\b", re.IGNORECASE),
+    "en": re.compile(r"^If\b", re.IGNORECASE),
+}
 
 LABELS = {
     "fr": {
@@ -275,7 +387,10 @@ LABELS = {
         "revision": "Révision",
         "contents": "Sommaire",
         "decisions": "Décisions attendues",
+        "need": "Besoin",
         "goals": "Objectifs",
+        "axes": "Axes",
+        "sources": "Sources",
         "outOfScope": "Hors périmètre",
         "requirements": "Exigences",
         "tasks": "Tâches",
@@ -308,6 +423,7 @@ LABELS = {
         "overview": "Vue d'ensemble (g)",
         "kindContext": "Contexte",
         "kindDecision": "Décision attendue",
+        "kindAxis": "Axe",
         "kindRequirement": "Exigence",
         "kindTask": "Tâche",
         "previous": "Précédent",
@@ -317,13 +433,26 @@ LABELS = {
         "darkTheme": "Thème sombre",
         "lightTheme": "Thème clair",
         "empty": "Aucun élément.",
+        "crossAxisDependency": "Tâche de l'axe {axis}",
+        "changesOnly": "Seulement les changements",
+        "showAll": "Tout afficher",
+        "changeNew": "nouveau",
+        "changeModified": "modifié",
+        "changesSince": "Changements depuis la révision {revision}",
+        "changesSincePrevious": "Changements depuis la révision précédente",
+        "removed": "Retirés : {items}",
+        "countNew": {"one": "{count} nouveau", "many": "{count} nouveaux"},
+        "countModified": {"one": "{count} modifié", "many": "{count} modifiés"},
     },
     "en": {
         "brief": "Brief",
         "revision": "Revision",
         "contents": "Contents",
         "decisions": "Decisions needed",
+        "need": "Need",
         "goals": "Goals",
+        "axes": "Axes",
+        "sources": "Sources",
         "outOfScope": "Out of scope",
         "requirements": "Requirements",
         "tasks": "Tasks",
@@ -356,6 +485,7 @@ LABELS = {
         "overview": "Overview (g)",
         "kindContext": "Context",
         "kindDecision": "Decision needed",
+        "kindAxis": "Axis",
         "kindRequirement": "Requirement",
         "kindTask": "Task",
         "previous": "Previous",
@@ -365,6 +495,16 @@ LABELS = {
         "darkTheme": "Dark theme",
         "lightTheme": "Light theme",
         "empty": "None recorded.",
+        "crossAxisDependency": "Task in axis {axis}",
+        "changesOnly": "Only changes",
+        "showAll": "Show everything",
+        "changeNew": "new",
+        "changeModified": "changed",
+        "changesSince": "Changes since revision {revision}",
+        "changesSincePrevious": "Changes since the previous revision",
+        "removed": "Removed: {items}",
+        "countNew": {"one": "{count} new", "many": "{count} new"},
+        "countModified": {"one": "{count} changed", "many": "{count} changed"},
     },
 }
 
@@ -429,9 +569,24 @@ nav strong{display:block;font-size:.72rem;text-transform:uppercase;letter-spacin
 nav ul{list-style:none;margin:.5rem 0 0;padding:0}
 nav a{display:block;padding:.16rem 0;font-size:.86rem;color:var(--fg);text-decoration:none}
 nav a:hover{color:var(--accent)}
+nav .nav-sub{margin:0 0 .2rem;padding-left:.8rem;border-left:1px solid var(--border)}
+nav .nav-sub a{font-size:.8rem;color:var(--muted)}
 h1{font-size:1.9rem;line-height:1.2;margin:.4rem 0 .6rem;max-width:var(--measure)}
 h2{font-size:1.18rem;line-height:1.3;margin:0 0 .9rem;scroll-margin-top:4.5rem}
-h3{font-size:.95rem;margin:1.2rem 0 .4rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+h3,h4{font-size:.95rem;margin:1.2rem 0 .4rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+h4{font-size:.82rem}
+section[id],details[id]{scroll-margin-top:4.5rem}
+.page-head{margin:0 0 1.6rem}
+.changes-banner{margin:0 0 1.6rem;padding:.7rem 1rem;border:1px solid var(--accent);border-radius:10px;background:var(--accent-soft)}
+.changes-banner p{margin:0;font-size:.9rem}
+.axis-section{margin:0 0 2.6rem}
+.axis-head>h2{padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+.axis-part>h3{margin-top:1.4rem}
+.group-label{margin:.7rem 0 .35rem;font-size:.8rem;font-weight:600;color:var(--muted)}
+.dep-link{color:inherit;text-decoration:underline dotted;text-underline-offset:2px}
+.dep-cross{padding:0 .3em;border:1px dashed var(--task);border-radius:4px;text-decoration:none}
+.axes a{color:var(--fg);text-decoration:none}
+.axes a:hover .axis-name{color:var(--accent)}
 p,li{max-width:var(--measure)}
 a{color:var(--accent)}
 code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;padding:.05em .32em;font-size:.86em}
@@ -453,9 +608,17 @@ code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;
 .item-body{padding:.35rem 0 .2rem 1rem;border-top:1px solid var(--border);margin-top:.55rem}
 .item-body ul{margin:.3rem 0;padding-left:1.1rem}
 .outcome{display:block;margin:.25rem 0 0 1rem;color:var(--muted);font-size:.92rem;max-width:var(--measure)}
+.axis-name{font-weight:600}
+.sources ul{margin:.3rem 0 0;padding-left:1.1rem}
+.sources li{font-size:.9rem}
+.sources-footer{display:none}
+.axes li{margin:.35rem 0}
 .badge{display:inline-block;margin-left:.4rem;padding:.02rem .45rem;border-radius:99px;font-size:.72rem;
   border:1px solid var(--border);background:var(--chip-bg);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .badge-must{border-color:var(--accent);color:var(--accent)}
+.badge-new{border-color:var(--task);color:var(--task)}
+.badge-changed{border-color:var(--decision-border);color:var(--decision-fg);background:var(--decision-bg)}
+body.changes-only:not(.presenting) [data-change="same"]{display:none}
 .chip{display:inline-block;margin-left:.4rem;padding:.02rem .45rem;border-radius:99px;font-size:.72rem;
   background:var(--chip-bg);color:var(--muted)}
 .group>summary{cursor:pointer;font-weight:600}
@@ -473,6 +636,7 @@ code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;
 .rail-segment{flex:1 1 0;min-width:0;height:6px;padding:0;border:0;border-radius:2px;background:var(--border);cursor:pointer}
 .rail-segment:hover{border-color:transparent}
 .rail-segment[data-slide-kind="decision"]{background:var(--decision-border)}
+.rail-segment[data-slide-kind="axis"]{background:var(--muted)}
 .rail-segment[data-slide-kind="requirement"]{background:var(--accent)}
 .rail-segment[data-slide-kind="task"]{background:var(--task)}
 .rail-segment.is-past{opacity:.3}
@@ -485,6 +649,7 @@ code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;
   padding:.5rem .6rem;font-size:.78rem;line-height:1.3;cursor:pointer}
 .grid-tile:hover{color:var(--fg)}
 .grid-tile[data-slide-kind="decision"]{border-top-color:var(--decision-border)}
+.grid-tile[data-slide-kind="axis"]{border-top-color:var(--muted)}
 .grid-tile[data-slide-kind="requirement"]{border-top-color:var(--accent)}
 .grid-tile[data-slide-kind="task"]{border-top-color:var(--task)}
 .grid-tile.is-current{outline:2px solid var(--fg);outline-offset:1px}
@@ -492,23 +657,26 @@ code{background:var(--code-bg);border:1px solid var(--border);border-radius:5px;
 body.presenting{overflow:hidden}
 body.presenting .topbar{height:var(--pres-topbar);flex-wrap:nowrap;gap:.4rem;padding:.25rem .8rem;overflow:hidden}
 body.presenting .topbar-title{font-size:.72rem;max-width:45vw}
-body.presenting #density,body.presenting #agent-toggle,body.presenting #expand-all{display:none}
-body.presenting aside,body.presenting .agent-note{display:none}
+body.presenting #density,body.presenting #agent-toggle,body.presenting #expand-all,body.presenting #changes-only{display:none}
+body.presenting aside,body.presenting .agent-note,body.presenting .changes-banner{display:none}
 body.presenting .layout{display:block;max-width:none;margin:0;padding:0}
 body.presenting main{height:calc(100vh - var(--pres-topbar) - var(--pres-bar));
   height:calc(100dvh - var(--pres-topbar) - var(--pres-bar));overflow:auto;
   display:grid;align-content:safe center;justify-items:center;
   padding:calc(var(--pres-rail) + var(--stage-pad)) var(--stage-pad) var(--stage-pad)}
 body.presenting .slide{width:min(100%,var(--stage-max));margin:0}
-body.presenting .block{margin:0;padding:0;width:min(100%,var(--stage-max))}
+body.presenting .block,body.presenting .axis-section,body.presenting .axis-part,body.presenting .page-head{
+  margin:0;padding:0;width:min(100%,var(--stage-max))}
+body.presenting .page-head{margin-bottom:var(--slide-gap);display:flex;flex-direction:column;gap:var(--slide-gap)}
 body.presenting .pres-group{display:flex;flex-direction:column;gap:var(--slide-gap)}
-body.presenting .pres-group>h2{font-size:var(--slide-eyebrow);font-weight:600;text-transform:uppercase;
-  letter-spacing:.12em;color:var(--muted);border-bottom:0;padding:0;margin:0}
-body.presenting .pres-group>h3{display:none}
-body.presenting header.slide,body.presenting section.slide{display:flex;flex-direction:column;gap:var(--slide-gap)}
-body.presenting .slide h1,body.presenting .slide>h2,body.presenting .group>summary h2,body.presenting .item-title{
+body.presenting .axis-part>h3,body.presenting .need>h2{font-size:var(--slide-eyebrow);font-weight:600;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--muted);border-bottom:0;padding:0;margin:0;max-width:none}
+body.presenting .group-label{display:none}
+body.presenting header.slide,body.presenting section.slide,body.presenting div.slide{display:flex;flex-direction:column;gap:var(--slide-gap)}
+body.presenting .slide h1,body.presenting .page-head h1,body.presenting .slide>h2,body.presenting .group>summary h2,body.presenting .item-title{
   font-size:var(--slide-title);line-height:1.08;letter-spacing:-.025em;font-weight:700;
   max-width:var(--title-measure);margin:0;border:0;padding:0;text-wrap:balance}
+body.presenting .need>h2{font-size:var(--slide-eyebrow);letter-spacing:.12em;font-weight:600;line-height:1.3}
 body.presenting .slide p,body.presenting .slide li{font-size:var(--slide-body);line-height:1.45;max-width:var(--body-measure)}
 body.presenting .slide ul,body.presenting .slide ol{display:flex;flex-direction:column;gap:.45em;margin:0;padding-left:1.1em}
 body.presenting .slide .summary{font-size:var(--slide-lede);color:var(--muted);margin:0}
@@ -521,11 +689,13 @@ body.presenting .count-value{font-size:var(--slide-number);font-weight:700;line-
   letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--fg)}
 body.presenting .count-label{font-size:var(--slide-eyebrow);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 body.presenting .count-decision .count-value{color:var(--decision-fg)}
+body.presenting .sources{display:none}
+body.presenting .slide .sources-footer{display:block;margin:0;max-width:none;
+  font-size:var(--slide-eyebrow);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 body.presenting .decisions{background:none;border:0;border-radius:0}
 body.presenting[data-presenting-kind="decision"] main{background:var(--decision-bg)}
 body.presenting[data-presenting-kind="decision"] .presentation-rail{background:var(--decision-bg)}
-body.presenting[data-presenting-kind="decision"] .slide .meta,
-body.presenting[data-presenting-kind="decision"] .pres-group>h2{color:var(--decision-fg)}
+body.presenting[data-presenting-kind="decision"] .slide .meta{color:var(--decision-fg)}
 body.presenting details.item.slide{display:flex;flex-direction:column;gap:var(--slide-gap);
   position:relative;overflow:hidden;background:none;border:0;padding:0}
 body.presenting .slide[data-slide-ref]::after{content:attr(data-slide-ref);position:fixed;left:0;
@@ -539,11 +709,13 @@ body.presenting .item>summary>code{order:0;background:none;border:0;padding:0;fo
   font-size:var(--slide-eyebrow);letter-spacing:.1em;color:var(--muted)}
 body.presenting .item>summary .badges{order:1;display:flex;flex-wrap:wrap;gap:.4rem}
 body.presenting .badge,body.presenting .chip{margin-left:0;font-size:var(--slide-eyebrow);padding:.15rem .75rem}
+body.presenting .axes .badge{margin-left:.6rem}
 body.presenting .item-title{order:2}
 body.presenting .outcome{order:3;font-size:var(--slide-lede);color:var(--muted);margin:0;max-width:var(--body-measure)}
 body.presenting .item-body{position:relative;z-index:1;border-top:0;margin:0;padding:0;
   display:flex;flex-direction:column;gap:var(--slide-gap)}
-body.presenting .item-body h3{font-size:var(--slide-eyebrow);margin:0;letter-spacing:.12em}
+body.presenting .item-body h4,body.presenting .slide>h3{font-size:var(--slide-eyebrow);margin:0;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 body.presenting .item-body ul{list-style:none;padding-left:0}
 body.presenting .item-body li{display:flex;gap:.6em;align-items:baseline}
 body.presenting .item-body li::before{content:"";flex:none;width:.7em;height:.7em;border-radius:3px;
@@ -597,7 +769,7 @@ body.compact .item{padding:.35rem .7rem}
   *{transition:none!important;animation:none!important}
 }
 @media print{
-  :root,:root[data-theme="dark"]{
+  :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{
     __LIGHT_TOKENS__
   }
   .topbar,aside,.presentation-bar,.presentation-rail,.presentation-grid,.agent-block,.agent-note{display:none!important}
@@ -655,9 +827,15 @@ SCRIPT_JS = """
   var CURRENT_CLASS = "is-current";
   var FORWARD_CLASS = "is-entering-forward";
   var BACKWARD_CLASS = "is-entering-backward";
+  var CHANGES_ONLY_CLASS = "changes-only";
+  var NOT_FOUND = -1;
+  var HASH_PREFIX_LENGTH = 1;
   var FORWARD_STEP = 1;
   var BACKWARD_STEP = -1;
   var densityButton = document.getElementById("density");
+  var changesButton = document.getElementById(PRD_CONFIG.changesButtonId);
+  var pageHead = document.getElementById(PRD_CONFIG.pageHeadId);
+  var agentNavEntry = document.getElementById(PRD_CONFIG.agentNavId);
   var themeButton = document.getElementById("theme");
   var agentButton = document.getElementById("agent-toggle");
   var expandButton = document.getElementById("expand-all");
@@ -672,16 +850,26 @@ SCRIPT_JS = """
   var agentSection = document.getElementById(PRD_CONFIG.agentSectionId);
   var agentNote = document.getElementById(PRD_CONFIG.agentNoteId);
   var stage = document.querySelector("main");
-  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var slides = sortedSlides();
   var groups = Array.prototype.slice.call(document.querySelectorAll(".pres-group"));
   var allDetails = Array.prototype.slice.call(document.querySelectorAll("details"));
   var agentVisible = false;
   var expanded = false;
   var presenting = false;
   var overviewVisible = false;
+  var changesOnly = false;
   var slideIndex = 0;
   var slideDirection = FORWARD_STEP;
   var printState = null;
+
+  function slidePosition(slide){
+    return PRD_CONFIG.slideOrder.indexOf(slide.getAttribute(PRD_CONFIG.keyAttribute));
+  }
+
+  function sortedSlides(){
+    var found = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+    return found.sort(function(first, second){ return slidePosition(first) - slidePosition(second); });
+  }
 
   function readStored(key){
     try { return window.localStorage.getItem(key); } catch (error) { return null; }
@@ -738,6 +926,7 @@ SCRIPT_JS = """
   function applyAgentVisibility(){
     if (agentSection) { agentSection.hidden = presenting || !agentVisible; }
     if (agentNote) { agentNote.hidden = presenting || agentVisible; }
+    if (agentNavEntry) { agentNavEntry.hidden = !agentVisible; }
     agentButton.textContent = agentVisible ? labels.hideAgent : labels.showAgent;
     agentButton.setAttribute("aria-pressed", agentVisible ? "true" : "false");
   }
@@ -746,6 +935,30 @@ SCRIPT_JS = """
     allDetails.forEach(function(element){ element.open = expanded; });
     expandButton.textContent = expanded ? labels.collapseAll : labels.expandAll;
     expandButton.setAttribute("aria-pressed", expanded ? "true" : "false");
+  }
+
+  function applyChangesFilter(){
+    if (!changesButton) { return; }
+    document.body.classList.toggle(CHANGES_ONLY_CLASS, changesOnly);
+    changesButton.textContent = changesOnly ? labels.showAll : labels.changesOnly;
+    changesButton.setAttribute("aria-pressed", changesOnly ? "true" : "false");
+  }
+
+  function slideIndexForKey(key){
+    for (var index = 0; index < slides.length; index += 1) {
+      if (slides[index].getAttribute(PRD_CONFIG.keyAttribute) === key) { return index; }
+    }
+    return NOT_FOUND;
+  }
+
+  function revealTarget(identifier){
+    if (!identifier) { return; }
+    var target = document.getElementById(identifier);
+    if (target && target.tagName === "DETAILS") { target.open = true; }
+  }
+
+  function revealHash(){
+    revealTarget(decodeURIComponent(window.location.hash.slice(HASH_PREFIX_LENGTH)));
   }
 
   function slideKind(slide){
@@ -848,12 +1061,14 @@ SCRIPT_JS = """
         slide.classList.remove(BACKWARD_CLASS);
       });
       groups.forEach(function(group){ group.hidden = false; });
+      if (pageHead) { pageHead.hidden = false; }
       applyAgentVisibility();
       return;
     }
     var current = slides[slideIndex];
     slides.forEach(function(slide, index){ slide.hidden = index !== slideIndex; });
     groups.forEach(function(group){ group.hidden = !group.contains(current); });
+    if (pageHead) { pageHead.hidden = !current || current.id !== PRD_CONFIG.briefId; }
     if (current) {
       openSlideDetails(current);
       animateSlide(current);
@@ -883,8 +1098,35 @@ SCRIPT_JS = """
   agentVisible = readStored(PRD_CONFIG.agentKey) === VISIBLE_VALUE;
   applyAgentVisibility();
   applyExpansion();
+  applyChangesFilter();
   refreshThemeButton();
   watchSchemeChanges();
+  revealHash();
+  window.addEventListener("hashchange", revealHash);
+
+  if (changesButton) {
+    changesButton.addEventListener("click", function(){
+      changesOnly = !changesOnly;
+      applyChangesFilter();
+    });
+  }
+
+  document.addEventListener("click", function(event){
+    var target = event.target;
+    if (!target || !target.closest) { return; }
+    var link = target.closest("[" + PRD_CONFIG.slideTargetAttribute + "]");
+    if (link && presenting) {
+      event.preventDefault();
+      var index = slideIndexForKey(link.getAttribute(PRD_CONFIG.slideTargetAttribute));
+      if (index !== NOT_FOUND) { goToSlide(index); }
+      return;
+    }
+    if (link) {
+      revealTarget(link.hash.slice(HASH_PREFIX_LENGTH));
+      return;
+    }
+    if (presenting && target.closest("summary")) { event.preventDefault(); }
+  });
 
   themeButton.addEventListener("click", function(){
     if (currentTheme() === PRD_CONFIG.darkTheme) {
@@ -926,6 +1168,7 @@ SCRIPT_JS = """
     var target = event.target;
     if (target && INTERACTIVE_TAGS.indexOf(target.tagName) !== -1) { return; }
     if (target && target.isContentEditable) { return; }
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) { return; }
     if (event.key === PRESENTATION_KEY) {
       presenting = !presenting;
       slideIndex = 0;
@@ -983,11 +1226,44 @@ def list_html(items, empty_label, list_tag="ul"):
     return f"<{list_tag}>{entries}</{list_tag}>"
 
 
-def slide_attributes(kind, title, reference=""):
-    attributes = f' {SLIDE_KIND_ATTRIBUTE}="{escape(kind)}" {SLIDE_TITLE_ATTRIBUTE}="{escape(title)}"'
+def slide_attributes(kind, title, key, reference=""):
+    attributes = (
+        f' {SLIDE_KIND_ATTRIBUTE}="{escape(kind)}" {SLIDE_TITLE_ATTRIBUTE}="{escape(title)}"'
+        f' {SLIDE_KEY_ATTRIBUTE}="{escape(key)}"'
+    )
     if reference:
         attributes += f' {SLIDE_REF_ATTRIBUTE}="{escape(reference)}"'
     return attributes
+
+
+def slide_key(prefix, identifier):
+    return f"{prefix}{identifier}"
+
+
+def axis_items(items, axis_id):
+    return [item for item in items if item["axis"] == axis_id]
+
+
+def requirement_priority_groups(requirements):
+    must_items = [item for item in requirements if item["priority"] == MUST_PRIORITY]
+    other_items = [item for item in requirements if item["priority"] != MUST_PRIORITY]
+    return must_items, other_items
+
+
+def ordered_requirements(requirements):
+    must_items, other_items = requirement_priority_groups(requirements)
+    return must_items + other_items
+
+
+def slide_order(document):
+    keys = [DECISIONS_ID, BRIEF_ID, AXES_ID]
+    for axis in document["axes"]:
+        keys.append(slide_key(AXIS_KEY_PREFIX, axis["id"]))
+        axis_requirements = ordered_requirements(axis_items(document["requirements"], axis["id"]))
+        keys.extend(slide_key(REQUIREMENT_KEY_PREFIX, item["id"]) for item in axis_requirements)
+        keys.extend(slide_key(TASK_KEY_PREFIX, item["id"]) for item in axis_items(document["tasks"], axis["id"]))
+    keys.extend([OUT_OF_SCOPE_ID, SECONDARY_ID, IMPACT_ID])
+    return keys
 
 
 def slide_classes(classes, item_count):
@@ -1018,6 +1294,9 @@ def visible_words(document):
     for field in ("openQuestions", "goals", "outOfScope") + SECONDARY_FIELDS:
         texts.extend(document[field])
     texts.extend(document["preDraft"]["sharedSurfaces"])
+    for axis in document["axes"]:
+        texts.append(axis["title"])
+        texts.append(axis["summary"])
     if not uses_default_source_priority(document):
         texts.extend(document["preDraft"]["sourcePriority"])
     for requirement in document["requirements"]:
@@ -1040,9 +1319,15 @@ def agent_entry_count(document):
     return total
 
 
-def count_html(labels, key, count, extra_class=""):
+def plural_form(labels, key, count):
     forms = labels[key]
-    form = forms["one"] if count == SINGULAR_COUNT else forms["many"]
+    if count == SINGULAR_COUNT:
+        return forms["one"]
+    return forms["many"]
+
+
+def count_html(labels, key, count, extra_class=""):
+    form = plural_form(labels, key, count)
     prefix, _, suffix = form.partition(COUNT_PLACEHOLDER)
     classes = f"count {extra_class}".strip()
     return (
@@ -1062,73 +1347,230 @@ def count_strip_html(document, labels):
     return f'<p class="counts">{separator.join(parts)}</p>'
 
 
-def brief_html(document, labels):
+def source_entry_html(source):
+    title = escape(source["title"])
+    reference = escape(source["ref"])
+    if source["ref"].startswith(LINK_PREFIXES):
+        return f'<li><a href="{reference}" target="_blank" rel="noopener">{title}</a></li>'
+    return f"<li>{title} <code>{reference}</code></li>"
+
+
+def sources_html(sources, labels):
+    if not sources:
+        return ""
+    entries = "".join(source_entry_html(source) for source in sources)
+    titles = SOURCE_SEPARATOR.join(source["title"] for source in sources)
     return (
-        f'<header id="{BRIEF_ID}" class="block slide"'
-        f'{slide_attributes(KIND_CONTEXT, document["title"])}>'
-        f'<p class="meta"><code>{escape(document["id"])}</code>{escape(COUNT_SEPARATOR)}'
-        f'{escape(labels["revision"])} {escape(document["revision"])}</p>'
-        f'<h1>{escape(document["title"])}</h1>'
-        f'<p class="summary">{escape(document["summary"])}</p>'
-        f"{count_strip_html(document, labels)}</header>"
+        f'<div class="sources"><h3>{escape(labels["sources"])}</h3><ul>{entries}</ul></div>'
+        f'<p class="sources-footer">{escape(labels["sources"])}'
+        f"{escape(COUNT_SEPARATOR)}{escape(titles)}</p>"
     )
 
 
-def requirement_html(requirement, labels):
+def page_head_html(document, labels):
+    return (
+        f'<header id="{PAGE_HEAD_ID}" class="page-head">'
+        f'<p class="meta"><code>{escape(document["id"])}</code>{escape(COUNT_SEPARATOR)}'
+        f'{escape(labels["revision"])} {escape(document["revision"])}</p>'
+        f'<h1>{escape(document["title"])}</h1></header>'
+    )
+
+
+def brief_html(document, labels):
+    content = (
+        f'<p class="summary">{escape(document["summary"])}</p>'
+        f'<h3>{escape(labels["goals"])}</h3>'
+        f'{list_html(document["goals"], labels["empty"])}'
+        f"{count_strip_html(document, labels)}"
+        f'{sources_html(document["sources"], labels)}'
+    )
+    return block_html(
+        BRIEF_ID,
+        labels["need"],
+        content,
+        slide_classes("block slide need", len(document["goals"])),
+        extra_attributes=slide_attributes(KIND_CONTEXT, labels["need"], BRIEF_ID),
+    )
+
+
+def change_status(changes, field, key):
+    if changes is None:
+        return None
+    return changes[field].get(key)
+
+
+def change_badge(status, labels):
+    label_key = CHANGE_LABEL_KEYS.get(status)
+    if label_key is None:
+        return ""
+    return f'<span class="badge badge-{status}">{escape(labels[label_key])}</span>'
+
+
+def unchanged_attribute(statuses):
+    if statuses and all(status == CHANGE_SAME for status in statuses):
+        return f' {CHANGE_ATTRIBUTE}="{CHANGE_SAME}"'
+    return ""
+
+
+def axis_statuses(document, axis, changes):
+    axis_id = axis["id"]
+    statuses = [change_status(changes, "axes", axis_id)]
+    statuses.extend(change_status(changes, "requirements", item["id"]) for item in axis_items(document["requirements"], axis_id))
+    statuses.extend(change_status(changes, "tasks", item["id"]) for item in axis_items(document["tasks"], axis_id))
+    return statuses
+
+
+def axis_anchor(axis_id):
+    return f"{AXIS_ANCHOR_PREFIX}{axis_id}"
+
+
+def slide_link_attributes(anchor, key):
+    return f'href="#{escape(anchor)}" {SLIDE_TARGET_ATTRIBUTE}="{escape(key)}"'
+
+
+def axes_html(document, labels, changes):
+    entries = "".join(
+        f'<li{unchanged_attribute(axis_statuses(document, axis, changes))}>'
+        f'<a {slide_link_attributes(axis_anchor(axis["id"]), slide_key(AXIS_KEY_PREFIX, axis["id"]))}>'
+        f'<code>{escape(axis["id"])}</code> '
+        f'<span class="axis-name">{escape(axis["title"])}</span></a>'
+        f'{change_badge(change_status(changes, "axes", axis["id"]), labels)}'
+        f'<span class="outcome">{escape(axis["summary"])}</span></li>'
+        for axis in document["axes"]
+    )
+    return block_html(
+        AXES_ID,
+        labels["axes"],
+        f"<ul>{entries}</ul>",
+        slide_classes("block slide axes", len(document["axes"])),
+        extra_attributes=slide_attributes(KIND_AXIS, labels["axes"], AXES_ID),
+    )
+
+
+def axis_head_html(axis, labels, changes):
+    heading_id = f"{axis_anchor(axis['id'])}-title"
+    attributes = slide_attributes(KIND_AXIS, axis["title"], slide_key(AXIS_KEY_PREFIX, axis["id"]), axis["id"])
+    return (
+        f'<div class="slide axis-head"{attributes}>'
+        f'<h2 id="{heading_id}">{escape(axis["id"])}{escape(COUNT_SEPARATOR)}{escape(axis["title"])}'
+        f'{change_badge(change_status(changes, "axes", axis["id"]), labels)}</h2>'
+        f'<p class="summary">{escape(axis["summary"])}</p></div>'
+    )
+
+
+def requirement_html(requirement, labels, status):
     priority = escape(requirement["priority"])
     badges = (
         '<span class="badges">'
         f'<span class="badge badge-{priority}">{priority}</span>'
         f'<span class="badge">{escape(requirement["status"])}</span>'
         f'<span class="badge">{escape(requirement["kind"])}</span>'
+        f"{change_badge(status, labels)}"
         "</span>"
     )
     classes = slide_classes("item slide", len(requirement["acceptance"]))
-    attributes = slide_attributes(KIND_REQUIREMENT, requirement["title"], requirement["id"])
+    attributes = slide_attributes(
+        KIND_REQUIREMENT,
+        requirement["title"],
+        slide_key(REQUIREMENT_KEY_PREFIX, requirement["id"]),
+        requirement["id"],
+    )
     return (
-        f'<details class="{classes}"{attributes}>'
-        f'<summary><code>{escape(requirement["id"])}</code> '
+        f'<details id="{REQUIREMENT_ANCHOR_PREFIX}{escape(requirement["id"])}" class="{classes}"'
+        f"{attributes}{unchanged_attribute([status])}>"
+        f'<summary><code>{escape(requirement["axis"])}{escape(COUNT_SEPARATOR)}'
+        f'{escape(requirement["id"])}</code> '
         f'<span class="item-title">{escape(requirement["title"])}</span>{badges}</summary>'
         f'<div class="item-body"><p>{escape(requirement["description"])}</p>'
-        f'<h3>{escape(labels["acceptance"])}</h3>'
+        f'<h4>{escape(labels["acceptance"])}</h4>'
         f'{list_html(requirement["acceptance"], labels["empty"])}</div>'
         "</details>"
     )
 
 
-def requirements_html(requirements, labels):
-    must_items = [item for item in requirements if item["priority"] == MUST_PRIORITY]
-    other_items = [item for item in requirements if item["priority"] != MUST_PRIORITY]
-    parts = []
+def requirements_part_html(requirements, labels, changes):
+    parts = [f'<h3>{escape(labels["requirements"])}</h3>']
+    statuses = []
+    must_items, other_items = requirement_priority_groups(requirements)
     for heading, group in ((labels["mustGroup"], must_items), (labels["otherGroup"], other_items)):
         if not group:
             continue
-        parts.append(f"<h3>{escape(heading)}</h3>")
-        parts.extend(requirement_html(item, labels) for item in group)
-    return "".join(parts)
+        group_statuses = [change_status(changes, "requirements", item["id"]) for item in group]
+        statuses.extend(group_statuses)
+        parts.append(f'<p class="group-label"{unchanged_attribute(group_statuses)}>{escape(heading)}</p>')
+        parts.extend(requirement_html(item, labels, status) for item, status in zip(group, group_statuses))
+    return f'<div class="axis-part pres-group"{unchanged_attribute(statuses)}>{"".join(parts)}</div>'
 
 
-def task_html(task, labels):
-    chip = ""
-    if task["dependsOn"]:
-        dependencies = DEPENDENCY_SEPARATOR.join(task["dependsOn"])
-        chip = (
-            '<span class="badges">'
-            f'<span class="chip">{escape(labels["afterChip"].format(dependencies=dependencies))}</span>'
-            "</span>"
-        )
+def dependency_link_html(dependency, task_axis, task_axes, labels):
+    dependency_axis = task_axes.get(dependency)
+    text = dependency
+    classes = "dep-link"
+    hint = ""
+    if dependency_axis is not None and dependency_axis != task_axis:
+        text = f"{dependency}{COUNT_SEPARATOR}{dependency_axis}"
+        classes = f"{classes} dep-cross"
+        hint = f' title="{escape(labels["crossAxisDependency"].format(axis=dependency_axis))}"'
+    attributes = slide_link_attributes(f"{TASK_ANCHOR_PREFIX}{dependency}", slide_key(TASK_KEY_PREFIX, dependency))
+    return f'<a class="{classes}" {attributes}{hint}>{escape(text)}</a>'
+
+
+def dependency_chip_html(task, task_axes, labels):
+    if not task["dependsOn"]:
+        return ""
+    prefix, _, suffix = labels["afterChip"].partition(DEPENDENCIES_PLACEHOLDER)
+    links = escape(DEPENDENCY_SEPARATOR).join(
+        dependency_link_html(dependency, task["axis"], task_axes, labels) for dependency in task["dependsOn"]
+    )
+    return f'<span class="chip">{escape(prefix)}{links}{escape(suffix)}</span>'
+
+
+def task_html(task, labels, task_axes, status):
+    badges = f"{dependency_chip_html(task, task_axes, labels)}{change_badge(status, labels)}"
+    if badges:
+        badges = f'<span class="badges">{badges}</span>'
     classes = slide_classes("item slide", len(task["acceptance"]))
-    attributes = slide_attributes(KIND_TASK, task["title"], task["id"])
+    attributes = slide_attributes(
+        KIND_TASK, task["title"], slide_key(TASK_KEY_PREFIX, task["id"]), task["id"]
+    )
     return (
-        f'<details class="{classes}"{attributes}>'
-        f'<summary><code>{escape(task["id"])}</code> '
-        f'<span class="item-title">{escape(task["title"])}</span>{chip}'
+        f'<details id="{TASK_ANCHOR_PREFIX}{escape(task["id"])}" class="{classes}"'
+        f"{attributes}{unchanged_attribute([status])}>"
+        f'<summary><code>{escape(task["axis"])}{escape(COUNT_SEPARATOR)}'
+        f'{escape(task["id"])}</code> '
+        f'<span class="item-title">{escape(task["title"])}</span>{badges}'
         f'<span class="outcome">{escape(task["expectedOutcome"])}</span></summary>'
-        f'<div class="item-body"><h3>{escape(labels["startCondition"])}</h3>'
+        f'<div class="item-body"><h4>{escape(labels["startCondition"])}</h4>'
         f'<p>{escape(task["startCondition"])}</p>'
-        f'<h3>{escape(labels["acceptance"])}</h3>'
+        f'<h4>{escape(labels["acceptance"])}</h4>'
         f'{list_html(task["acceptance"], labels["empty"])}</div>'
         "</details>"
+    )
+
+
+def tasks_part_html(tasks, labels, changes, task_axes):
+    if not tasks:
+        return ""
+    statuses = [change_status(changes, "tasks", task["id"]) for task in tasks]
+    entries = "".join(task_html(task, labels, task_axes, status) for task, status in zip(tasks, statuses))
+    return (
+        f'<div class="axis-part pres-group"{unchanged_attribute(statuses)}>'
+        f'<h3>{escape(labels["tasks"])}</h3>{entries}</div>'
+    )
+
+
+def axis_section_html(document, axis, labels, changes):
+    anchor = axis_anchor(axis["id"])
+    task_axes = {task["id"]: task["axis"] for task in document["tasks"]}
+    requirements = axis_items(document["requirements"], axis["id"])
+    tasks = axis_items(document["tasks"], axis["id"])
+    return (
+        f'<section id="{anchor}" class="axis-section pres-group" aria-labelledby="{anchor}-title"'
+        f"{unchanged_attribute(axis_statuses(document, axis, changes))}>"
+        f"{axis_head_html(axis, labels, changes)}"
+        f"{requirements_part_html(requirements, labels, changes)}"
+        f"{tasks_part_html(tasks, labels, changes, task_axes)}"
+        "</section>"
     )
 
 
@@ -1141,7 +1583,7 @@ def secondary_html(document, labels):
     heading = f'<h2 id="{SECONDARY_ID}-title">{escape(labels["secondary"])}</h2>'
     item_count = sum(len(document[field]) for field in SECONDARY_FIELDS)
     classes = slide_classes("block slide", item_count)
-    attributes = slide_attributes(KIND_CONTEXT, labels["secondary"])
+    attributes = slide_attributes(KIND_CONTEXT, labels["secondary"], SECONDARY_ID)
     return (
         f'<section id="{SECONDARY_ID}" class="{classes}" aria-labelledby="{SECONDARY_ID}-title"{attributes}>'
         f'<details class="group"><summary>{heading}</summary>{entries}</details>'
@@ -1185,7 +1627,7 @@ def impact_html(document, labels):
         labels["impact"],
         "".join(parts),
         slide_classes("block slide", item_count),
-        extra_attributes=slide_attributes(KIND_CONTEXT, labels["impact"]),
+        extra_attributes=slide_attributes(KIND_CONTEXT, labels["impact"], IMPACT_ID),
     )
 
 
@@ -1193,48 +1635,110 @@ def list_block(document, labels, entry):
     identifier, label_key, field, classes, list_tag, kind = entry
     title = labels[label_key]
     content = list_html(document[field], labels["empty"], list_tag=list_tag)
-    markup = block_html(
+    return block_html(
         identifier,
         title,
         content,
         slide_classes(classes, len(document[field])),
-        extra_attributes=slide_attributes(kind, title),
+        extra_attributes=slide_attributes(kind, title, identifier),
     )
-    return (identifier, title, markup)
 
 
-def build_blocks(document, labels):
-    blocks = [list_block(document, labels, entry) for entry in LIST_BLOCKS]
-    requirements = block_html(
-        REQUIREMENTS_ID,
-        labels["requirements"],
-        requirements_html(document["requirements"], labels),
-        "block pres-group",
+def decisions_html(document, labels, changes):
+    questions = document[QUESTIONS_FIELD]
+    title = labels["decisions"]
+    statuses = [change_status(changes, "questions", question) for question in questions]
+    content = list_html(questions, labels["empty"], list_tag="ol")
+    if changes is not None and questions:
+        entries = "".join(
+            f"<li{unchanged_attribute([status])}>{escape(question)}{change_badge(status, labels)}</li>"
+            for question, status in zip(questions, statuses)
+        )
+        content = f"<ol>{entries}</ol>"
+    attributes = slide_attributes(KIND_DECISION, title, DECISIONS_ID) + unchanged_attribute(statuses)
+    return block_html(
+        DECISIONS_ID,
+        title,
+        content,
+        slide_classes("block slide decisions", len(questions)),
+        extra_attributes=attributes,
     )
-    tasks = block_html(
-        TASKS_ID,
-        labels["tasks"],
-        "".join(task_html(task, labels) for task in document["tasks"]),
-        "block pres-group",
+
+
+def changes_banner_html(changes, labels):
+    if changes is None:
+        return ""
+    revision = changes["revision"]
+    heading = labels["changesSincePrevious"]
+    if revision is not None:
+        heading = labels["changesSince"].format(revision=revision)
+    statuses = [status for field in DIFFED_FIELDS + ("questions",) for status in changes[field].values()]
+    counts = [
+        count_html(labels, "countNew", statuses.count(CHANGE_NEW)),
+        count_html(labels, "countModified", statuses.count(CHANGE_MODIFIED)),
+    ]
+    removed = list(changes["removed"])
+    if changes["removedQuestions"]:
+        removed_questions = changes["removedQuestions"]
+        removed.append(plural_form(labels, "countQuestions", removed_questions).format(count=removed_questions))
+    removed_line = ""
+    if removed:
+        removed_line = f'<p>{escape(labels["removed"].format(items=SOURCE_SEPARATOR.join(removed)))}</p>'
+    return (
+        f'<section id="{CHANGES_ID}" class="changes-banner" aria-label="{escape(heading)}">'
+        f"<p><strong>{escape(heading)}</strong>{escape(COUNT_SEPARATOR)}"
+        f"{escape(COUNT_SEPARATOR).join(counts)}</p>{removed_line}</section>"
     )
-    blocks.extend(
+
+
+def build_blocks(document, labels, changes):
+    axis_sections = "".join(axis_section_html(document, axis, labels, changes) for axis in document["axes"])
+    return "".join(
         [
-            (REQUIREMENTS_ID, labels["requirements"], requirements),
-            (TASKS_ID, labels["tasks"], tasks),
-            (SECONDARY_ID, labels["secondary"], secondary_html(document, labels)),
-            (IMPACT_ID, labels["impact"], impact_html(document, labels)),
-            (AGENT_CONTEXT_ID, labels["agentContext"], agent_context_html(document, labels)),
+            page_head_html(document, labels),
+            changes_banner_html(changes, labels),
+            decisions_html(document, labels, changes),
+            brief_html(document, labels),
+            list_block(document, labels, OUT_OF_SCOPE_BLOCK),
+            axes_html(document, labels, changes),
+            axis_sections,
+            secondary_html(document, labels),
+            impact_html(document, labels),
+            agent_context_html(document, labels),
         ]
     )
-    return blocks
 
 
-def toolbar_html(labels):
-    buttons = "".join(
-        f'<button id="{identifier}" type="button" aria-pressed="false">{escape(labels[label_key])}</button>'
-        for identifier, label_key in TOOLBAR_BUTTONS
+def navigation_entry_html(identifier, title, children="", attributes=""):
+    return f'<li{attributes}><a href="#{identifier}">{escape(title)}</a>{children}</li>'
+
+
+def navigation_html(document, labels):
+    axis_entries = "".join(
+        navigation_entry_html(axis_anchor(axis["id"]), f"{axis['id']}{COUNT_SEPARATOR}{axis['title']}")
+        for axis in document["axes"]
     )
-    return f'<div class="toolbar">{buttons}</div>'
+    entries = [
+        navigation_entry_html(DECISIONS_ID, labels["decisions"]),
+        navigation_entry_html(BRIEF_ID, labels["need"]),
+        navigation_entry_html(OUT_OF_SCOPE_ID, labels["outOfScope"]),
+        navigation_entry_html(AXES_ID, labels["axes"], f'<ul class="nav-sub">{axis_entries}</ul>'),
+        navigation_entry_html(SECONDARY_ID, labels["secondary"]),
+        navigation_entry_html(IMPACT_ID, labels["impact"]),
+        navigation_entry_html(AGENT_CONTEXT_ID, labels["agentContext"], attributes=f' id="{AGENT_NAV_ID}" hidden'),
+    ]
+    return "".join(entries)
+
+
+def toolbar_html(labels, changes):
+    buttons = list(TOOLBAR_BUTTONS)
+    if changes is not None:
+        buttons.insert(0, CHANGES_TOOLBAR_BUTTON)
+    markup = "".join(
+        f'<button id="{identifier}" type="button" aria-pressed="false">{escape(labels[label_key])}</button>'
+        for identifier, label_key in buttons
+    )
+    return f'<div class="toolbar">{markup}</div>'
 
 
 def presentation_bar_html(labels):
@@ -1251,9 +1755,11 @@ def presentation_bar_html(labels):
     )
 
 
-def script_config_html(labels):
+def script_config_html(document, labels):
     config = {
         "labels": labels,
+        "slideOrder": slide_order(document),
+        "keyAttribute": SLIDE_KEY_ATTRIBUTE,
         "densityKey": DENSITY_STORAGE_KEY,
         "agentKey": AGENT_STORAGE_KEY,
         "themeKey": THEME_STORAGE_KEY,
@@ -1262,6 +1768,11 @@ def script_config_html(labels):
         "lightTheme": LIGHT_THEME_VALUE,
         "agentSectionId": AGENT_CONTEXT_ID,
         "agentNoteId": AGENT_NOTE_ID,
+        "agentNavId": AGENT_NAV_ID,
+        "pageHeadId": PAGE_HEAD_ID,
+        "briefId": BRIEF_ID,
+        "changesButtonId": CHANGES_BUTTON_ID,
+        "slideTargetAttribute": SLIDE_TARGET_ATTRIBUTE,
         "kindAttribute": SLIDE_KIND_ATTRIBUTE,
         "titleAttribute": SLIDE_TITLE_ATTRIBUTE,
         "referenceAttribute": SLIDE_REF_ATTRIBUTE,
@@ -1272,13 +1783,10 @@ def script_config_html(labels):
     return f"<script>const PRD_CONFIG = {payload};</script>"
 
 
-def render_document(document):
+def render_document(document, changes=None):
     labels = labels_for(document)
-    blocks = build_blocks(document, labels)
-    navigation = "".join(
-        f'<li><a href="#{identifier}">{escape(title)}</a></li>' for identifier, title, _ in blocks
-    )
-    body = brief_html(document, labels) + "".join(markup for _, _, markup in blocks)
+    navigation = navigation_html(document, labels)
+    body = build_blocks(document, labels, changes)
     note = labels["agentHiddenNote"].format(count=agent_entry_count(document))
     agent_note = f'<p class="agent-note" id="{AGENT_NOTE_ID}">{escape(note)}</p>'
     return (
@@ -1293,13 +1801,13 @@ def render_document(document):
         "</head>\n"
         "<body>\n"
         f'<div class="topbar"><span class="topbar-title">{escape(document["title"])}</span>'
-        f"{toolbar_html(labels)}</div>\n"
+        f"{toolbar_html(labels, changes)}</div>\n"
         '<div class="layout">'
         f'<aside><nav aria-label="{escape(labels["contents"])}"><strong>{escape(labels["contents"])}</strong>'
         f"<ul>{navigation}</ul></nav></aside>"
         f"<main>{body}{agent_note}</main></div>\n"
         f"{presentation_bar_html(labels)}\n"
-        f"{script_config_html(labels)}\n"
+        f"{script_config_html(document, labels)}\n"
         f"<script>{SCRIPT_JS}</script>\n"
         "</body>\n"
         "</html>\n"
@@ -1321,9 +1829,98 @@ def check_acceptance_budget(acceptance, path, warnings):
         check_text_budget(item, f"{path}.acceptance[{position}]", ACCEPTANCE_WORD_BUDGET, warnings)
 
 
+def missing_task_warning(path, axis_id):
+    return f"{WARNING_PREFIX}{path}: axis '{axis_id}' has no task"
+
+
+def check_vague_words(text, path, locale, warnings):
+    for match in VAGUE_WORD_PATTERNS[locale].finditer(text):
+        warnings.append(f"{WARNING_PREFIX}{path} uses vague word '{match.group(0)}'")
+
+
+def check_items_vague_words(items, path, locale, warnings):
+    for position, item in enumerate(items):
+        check_vague_words(item, f"{path}[{position}]", locale, warnings)
+
+
+def has_edge_case(acceptance, locale):
+    pattern = EDGE_CASE_PATTERNS[locale]
+    return any(pattern.match(item.strip()) for item in acceptance)
+
+
+def missing_edge_case_warning(path):
+    return f"{WARNING_PREFIX}{path}: must requirement has no error or edge-case acceptance criterion"
+
+
+def collect_writing_warnings(document):
+    warnings = []
+    locale = document["locale"]
+    for index, requirement in enumerate(document["requirements"]):
+        path = f"requirements[{index}]"
+        check_vague_words(requirement["description"], f"{path}.description", locale, warnings)
+        check_items_vague_words(requirement["acceptance"], f"{path}.acceptance", locale, warnings)
+        if requirement["priority"] == MUST_PRIORITY and not has_edge_case(requirement["acceptance"], locale):
+            warnings.append(missing_edge_case_warning(f"{path}.acceptance"))
+    for index, task in enumerate(document["tasks"]):
+        path = f"tasks[{index}]"
+        check_vague_words(task["expectedOutcome"], f"{path}.expectedOutcome", locale, warnings)
+        check_items_vague_words(task["acceptance"], f"{path}.acceptance", locale, warnings)
+    return warnings
+
+
+def previous_index(previous, field):
+    items = previous.get(field)
+    if not isinstance(items, list):
+        return {}
+    return {
+        item[ID_FIELD]: item
+        for item in items
+        if isinstance(item, dict) and isinstance(item.get(ID_FIELD), str)
+    }
+
+
+def item_change(item, previous_items):
+    earlier = previous_items.get(item["id"])
+    if earlier is None:
+        return CHANGE_NEW
+    if any(key in earlier and earlier[key] != value for key, value in item.items()):
+        return CHANGE_MODIFIED
+    return CHANGE_SAME
+
+
+def previous_questions(previous):
+    questions = previous.get(QUESTIONS_FIELD)
+    if not isinstance(questions, list):
+        return []
+    return [question for question in questions if isinstance(question, str)]
+
+
+def build_changes(document, previous):
+    changes = {"removed": []}
+    for field in DIFFED_FIELDS:
+        earlier = previous_index(previous, field)
+        current_ids = {item["id"] for item in document[field]}
+        changes[field] = {item["id"]: item_change(item, earlier) for item in document[field]}
+        changes["removed"].extend(identifier for identifier in earlier if identifier not in current_ids)
+    earlier_questions = previous_questions(previous)
+    changes["questions"] = {
+        question: CHANGE_SAME if question in earlier_questions else CHANGE_NEW
+        for question in document[QUESTIONS_FIELD]
+    }
+    changes["removedQuestions"] = sum(1 for question in earlier_questions if question not in document[QUESTIONS_FIELD])
+    revision = previous.get(REVISION_FIELD)
+    changes["revision"] = revision if isinstance(revision, str) and revision.strip() else None
+    return changes
+
+
 def collect_warnings(document):
     warnings = []
     check_text_budget(document["summary"], "summary", SUMMARY_WORD_BUDGET, warnings)
+    for index, axis in enumerate(document["axes"]):
+        path = f"axes[{index}]"
+        check_text_budget(axis["summary"], f"{path}.summary", AXIS_SUMMARY_WORD_BUDGET, warnings)
+        if not axis_items(document["tasks"], axis["id"]):
+            warnings.append(missing_task_warning(path, axis["id"]))
     for field in BUDGETED_LIST_FIELDS:
         for index, item in enumerate(document[field]):
             check_text_budget(item, f"{field}[{index}]", LIST_ITEM_WORD_BUDGET, warnings)
@@ -1343,29 +1940,56 @@ def collect_warnings(document):
         path = f"tasks[{index}]"
         check_text_budget(task["expectedOutcome"], f"{path}.expectedOutcome", EXPECTED_OUTCOME_WORD_BUDGET, warnings)
         check_acceptance_budget(task["acceptance"], path, warnings)
-    return warnings
+    return warnings + collect_writing_warnings(document)
 
 
 def report_warnings(warnings):
     for warning in warnings:
         print(warning, file=sys.stderr)
-    print(f"{WARNING_PREFIX}{len(warnings)} budget warnings", file=sys.stderr)
+    if warnings:
+        print(f"{WARNING_PREFIX}{len(warnings)} warnings", file=sys.stderr)
+
+
+def load_json(path):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SystemExit(f"error: {error}") from error
+
+
+def load_previous(path):
+    previous = load_json(path)
+    if not isinstance(previous, dict):
+        raise SystemExit(f"error: {path}: expected a JSON object")
+    if previous.get(SCHEMA_VERSION_FIELD) != SCHEMA_VERSION:
+        print(
+            f"{NOTE_PREFIX}{path} uses schemaVersion {previous.get(SCHEMA_VERSION_FIELD)}; "
+            "items are compared by identifier on the fields both versions share",
+            file=sys.stderr,
+        )
+    return previous
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(prog="renderPrd.py")
+    parser.add_argument("input", help="PRD JSON source")
+    parser.add_argument("output", help="HTML output path")
+    parser.add_argument("--previous", help="earlier revision of the PRD JSON to highlight changes against")
+    return parser.parse_args()
 
 
 def main():
-    if len(sys.argv) != 3:
-        raise SystemExit("usage: renderPrd.py <file.prd.json> <output.html>")
-    input_path = Path(sys.argv[1])
-    output_path = Path(sys.argv[2])
-    try:
-        document = json.loads(input_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise SystemExit(f"error: {error}") from error
+    arguments = parse_arguments()
+    document = load_json(arguments.input)
     errors = validate_document(document)
     if errors:
         details = "\n".join(f"- {error}" for error in errors)
         raise SystemExit(f"validation failed:\n{details}")
-    output_path.write_text(render_document(document), encoding="utf-8")
+    changes = None
+    if arguments.previous is not None:
+        changes = build_changes(document, load_previous(arguments.previous))
+    output_path = Path(arguments.output)
+    output_path.write_text(render_document(document, changes), encoding="utf-8")
     print(output_path)
     report_warnings(collect_warnings(document))
 
