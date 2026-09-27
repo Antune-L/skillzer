@@ -1,16 +1,16 @@
 # Skillzer
 
-Collection of reusable skills, agents, and scheduled tasks for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+Collection of reusable Markdown instructions for Codex, [Claude Code](https://code.claude.com/docs/en/skills), and other assistants that support `SKILL.md` skills. Individual skills may depend on tools or commands that differ between assistants.
 
 ## Structure
 
 ```
 skillzer/
-├── skills/             # Reusable skill definitions (.claude/skills)
-├── agents/             # Custom agent definitions (.claude/agents)
-├── scheduled-tasks/    # Scheduled task definitions (.claude/scheduled-tasks)
+├── skills/             # Reusable SKILL.md instructions for compatible assistants
+├── agents/             # Claude Code agent definitions (.claude/agents)
+├── scheduled-tasks/    # Claude Code scheduled task definitions
 ├── example/            # Ready-to-copy CLAUDE.md template + docs/ structure
-└── CLAUDE.md           # Guide: how to write an effective CLAUDE.md
+└── CLAUDE.md           # Claude Code guide: writing an effective CLAUDE.md
 ```
 
 ## Writing a good CLAUDE.md
@@ -19,9 +19,9 @@ The [`CLAUDE.md`](./CLAUDE.md) at the root of this repo is a guide on how to wri
 
 ## Installation
 
-### Via the `skills` CLI (recommended)
+### Via the `skills` CLI
 
-Install any skill with a single command using [skills](https://github.com/vercel-labs/skills):
+Install a skill using [skills](https://github.com/vercel-labs/skills). Choose your assistant when the CLI prompts for a target:
 
 ```bash
 npx skills add Antune-L/skillzer/skills/<skill-name>
@@ -32,31 +32,19 @@ Available skills:
 ```bash
 npx skills add Antune-L/skillzer/skills/argus-review
 npx skills add Antune-L/skillzer/skills/audit-agents-skills
-npx skills add Antune-L/skillzer/skills/branch-summary
 npx skills add Antune-L/skillzer/skills/code-review
 npx skills add Antune-L/skillzer/skills/coding-convention
 npx skills add Antune-L/skillzer/skills/minos-pr-feedback
-npx skills add Antune-L/skillzer/skills/plan-review
 npx skills add Antune-L/skillzer/skills/prd
 npx skills add Antune-L/skillzer/skills/regression-check
-npx skills add Antune-L/skillzer/skills/smart-explore
 npx skills add Antune-L/skillzer/skills/ts-search-first
 ```
 
 ### Manual
 
-Copy or symlink the desired items into your `~/.claude/` directory:
+Copy a skill directory, including its `SKILL.md` and supporting files, to the location your assistant reads. [Codex](https://learn.chatgpt.com/docs/build-skills) reads personal skills from `~/.agents/skills/` and repository skills from `.agents/skills/`. [Claude Code](https://code.claude.com/docs/en/skills) reads personal skills from `~/.claude/skills/` and repository skills from `.claude/skills/`. Check the documentation for other assistants before choosing a destination.
 
-```bash
-# Skills
-cp -R skillzer/skills/my-skill ~/.claude/skills/
-
-# Agents
-cp skillzer/agents/my-agent.md ~/.claude/agents/
-
-# Scheduled tasks
-cp -R skillzer/scheduled-tasks/my-task ~/.claude/scheduled-tasks/
-```
+The `agents/`, `scheduled-tasks/`, and `CLAUDE.md` examples use Claude Code conventions; they are not portable skill definitions.
 
 ## Creating your own skills
 
@@ -70,7 +58,7 @@ See [`CLAUDE.md`](./CLAUDE.md) for more on writing effective skills and project 
 
 - **prd** was enhanced by [Westerbay](https://github.com/Westerbay). Thank you for the contribution!
 - **audit-agents-skills** is built on top of [claude-code-ultimate-guide](https://github.com/FlorianBruniaux/claude-code-ultimate-guide) combined with best practices shared by [an Anthropic engineer](https://x.com/trq212/status/2033949937936085378).
-- **architecture-reviewer** and **smart-explore** are adapted from [claude-code-ultimate-guide](https://github.com/FlorianBruniaux/claude-code-ultimate-guide) templates (`examples/agents/` and `examples/skills/`).
+- **architecture-reviewer** is adapted from a [claude-code-ultimate-guide](https://github.com/FlorianBruniaux/claude-code-ultimate-guide) template (`examples/agents/`).
 
 ## Other recommended skills
 
