@@ -1,8 +1,10 @@
 # Writing an effective CLAUDE.md
 
+@AGENTS.md
+
 Prank, it's not the CLAUDE.md you were thinking about..
 
-CLAUDE.md is the first thing Claude reads when entering your project. It shapes every decision the agent makes. Getting it right is the highest-leverage investment you can make for AI-assisted development.
+This file is a guide to writing project instructions for Claude Code. In a project that uses CLAUDE.md, Claude loads it as context; the `@AGENTS.md` import above also loads this repository's shared guidance. Keep the Claude-specific instructions focused on what the shared file does not cover.
 
 ## Philosophy: table of contents, not encyclopedia
 

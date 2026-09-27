@@ -10,12 +10,15 @@ skillzer/
 ├── agents/             # Claude Code agent definitions (.claude/agents)
 ├── scheduled-tasks/    # Claude Code scheduled task definitions
 ├── example/            # Ready-to-copy CLAUDE.md template + docs/ structure
+├── AGENTS.md           # Shared guide: writing effective agent instructions
 └── CLAUDE.md           # Claude Code guide: writing an effective CLAUDE.md
 ```
 
-## Writing a good CLAUDE.md
+## Writing good AGENTS.md and CLAUDE.md
 
-The [`CLAUDE.md`](./CLAUDE.md) at the root of this repo is a guide on how to write an effective CLAUDE.md for your projects — philosophy, principles, anti-patterns. The [`example/`](./example/) directory contains a ready-to-copy template with a pre-filled CLAUDE.md and `docs/` structure for a typical TypeScript/React/Node.js project.
+The root [`AGENTS.md`](./AGENTS.md) is a short guide to instructions shared across coding agents. The root [`CLAUDE.md`](./CLAUDE.md) explains how to write Claude-specific project guidance and imports the shared guide with `@AGENTS.md`. The [`example/`](./example/) directory contains a ready-to-copy CLAUDE.md template and `docs/` structure for a typical TypeScript/React/Node.js project.
+
+[Claude Code](https://code.claude.com/docs/en/memory#agentsmd) v2.1.277 or later can read AGENTS.md directly when no applicable CLAUDE.md or CLAUDE.local.md is present. When both exist, Claude normally reads CLAUDE.md; add `@AGENTS.md` outside a code fence in that file to include the shared instructions. The import also works in sessions where direct AGENTS.md support is unavailable.
 
 ## Installation
 
@@ -71,10 +74,10 @@ Skills we use but that aren't included in this repo — install them separately:
 - **[grill-me](https://github.com/mattpocock/skills/tree/main/skills/productivity/grill-me)** (Matt Pocock) — grills you with questions to test your understanding of a topic. Great for learning and interview prep.
 - **[remotion](https://www.remotion.dev/docs/ai/skills)** (Remotion official) — best practices for creating videos programmatically with React, so a coding agent can build and render videos.
 
-## Tips to Supercharge Your Claude Code Workflow
+## Tips to Supercharge Your Coding Agent Workflow
 
 - **Save tokens with RTK** — a Rust-based CLI proxy that cuts 60-90% of token usage on dev operations: [rtk-ai/rtk](https://github.com/rtk-ai/rtk)
-- **Use git worktrees for parallel work** — built-in to Claude Code (`isolation: "worktree"` on agents), or use [Worktrunk](https://worktrunk.dev/config/) for a managed setup
+- **Use git worktrees for parallel work** — supported by [Claude Code](https://code.claude.com/docs/en/sub-agents) (`isolation: "worktree"` on agents) and [Codex](https://learn.chatgpt.com/docs/environments/git-worktrees), or use [Worktrunk](https://worktrunk.dev/config/) for a managed setup
 - **Multitask with CMUX** — a multiplexer designed for Claude Code, run multiple agents side by side: [cmux.com](https://cmux.com/fr)
 - **Get notified when Claude finishes** — set up a [hook](https://docs.anthropic.com/en/docs/claude-code/hooks) on task completion, or use CMUX which has notifications built-in
 - **Leverage MCP servers** — extend Claude Code with Model Context Protocol servers:
