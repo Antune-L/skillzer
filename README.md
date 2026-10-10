@@ -34,6 +34,7 @@ Available skills:
 
 ```bash
 npx skills add Antune-L/skillzer/skills/argus-review
+npx skills add Antune-L/skillzer/skills/athena-analysis
 npx skills add Antune-L/skillzer/skills/audit-agents-skills
 npx skills add Antune-L/skillzer/skills/code-review
 npx skills add Antune-L/skillzer/skills/coding-convention
