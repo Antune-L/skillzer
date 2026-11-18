@@ -33,6 +33,7 @@ npx skills add Antune-L/skillzer/skills/<skill-name>
 Available skills:
 
 ```bash
+npx skills add Antune-L/skillzer/skills/apelles-ui-polish
 npx skills add Antune-L/skillzer/skills/argus-review
 npx skills add Antune-L/skillzer/skills/athena-analysis
 npx skills add Antune-L/skillzer/skills/audit-agents-skills
